@@ -10,7 +10,6 @@ import { getDatabase, ref, push, get, set } from "https://www.gstatic.com/fireba
 const firebaseConfig = {
   apiKey: "AIzaSyA5xccoSduwPvhrnR769i_2Fhp9zW63C5M",
   authDomain: "jeu-geii.firebaseapp.com",
-  // Ligne indispensable pour les bases de données européennes Firebase :
   databaseURL: "https://jeu-geii-default-rtdb.europe-west1.firebasedatabase.app",
   projectId: "jeu-geii",
   storageBucket: "jeu-geii.firebasestorage.app",
@@ -346,7 +345,6 @@ async function showPodium() {
     slideTo('screen-podium');
     let tbody = document.getElementById('podium-body'); 
     
-    // Ajout du spinner de chargement stylisé !
     tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#bdc3c7;">Chargement <div class="spinner"></div></td></tr>';
     
     try {

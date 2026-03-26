@@ -82,7 +82,15 @@ body {
 /* ==========================================
    TITRES, LOGOS ET ENTRÉES
    ========================================== */
-.logo-container { background-color: white; padding: 15px 30px; border-radius: 15px; display: inline-block; margin-bottom: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+.logo-container { 
+    background-color: white; 
+    padding: 15px 30px; 
+    border-radius: 15px; 
+    display: inline-block; 
+    margin-bottom: 20px; 
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3); 
+    transition: background-color 0.3s;
+}
 .logo-container img { max-width: 300px; height: auto; }
 
 h1 { color: #fff; font-size: 2.8em; margin-top: 0; margin-bottom: 10px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
@@ -173,3 +181,14 @@ button.secondary-btn { background-color: #3498db; color: white; font-size: 1.2em
 @keyframes scrollUp { 0% { transform: translateY(100%); } 100% { transform: translateY(-100%); } }
 .touch-to-start { margin-top: 50px; font-size: 2em; animation: pulse 2s infinite; color: #2ecc71; }
 @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
+
+/* ==========================================
+   GESTION DU MODE SOMBRE DU TÉLÉPHONE (DARK MODE)
+   ========================================== */
+@media (prefers-color-scheme: dark) {
+    .logo-container {
+        /* En mode sombre, on met un fond noir transparent élégant pour faire ressortir le logo blanc */
+        background-color: rgba(0, 0, 0, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+}
