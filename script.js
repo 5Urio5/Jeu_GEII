@@ -1,9 +1,8 @@
-/* global DB, confetti, XLSX */ // Indique à VS Code que ces variables viennent d'autres fichiers
+/* global DB, confetti, XLSX */
 
 // ==========================================
 // FONDS D'ÉCRAN DYNAMIQUES
 // ==========================================
-// Liste de tes images (elles doivent être dans le même dossier que le fichier script.js)
 const bgImages = [
     'appmeas.jpg',
     'intérieur_iut.jpg',
@@ -84,6 +83,10 @@ function playSound(type) {
 // ==========================================
 function slideTo(screenId) {
     const active = document.querySelector('.active-screen');
+    // CORRECTION DU BUG DE RÉINITIALISATION : 
+    // Si on demande d'afficher l'écran qui est DÉJÀ affiché, on ne fait rien pour éviter qu'il ne disparaisse !
+    if (active && active.id === screenId) return; 
+
     if (active) {
         active.classList.remove('active-screen'); active.classList.add('slide-out-left');
         setTimeout(() => { active.classList.add('hidden'); active.classList.remove('slide-out-left'); }, 400);
@@ -96,9 +99,17 @@ function slideTo(screenId) {
 
 function goToStart() {
     document.getElementById('player-name').value = '';
-    setRandomBackground(); // Change l'image de fond pour le nouveau joueur
+    setRandomBackground(); 
     resetIdleTimer(); slideTo('screen-start');
     setTimeout(() => { document.getElementById('player-name').focus(); }, 500);
+}
+
+// Nouvelle fonction pour annuler la partie (Bouton Croix)
+function cancelQuiz() {
+    if (confirm("⚠️ Es-tu sûr de vouloir annuler la partie en cours ?\n\nTa progression ne sera pas sauvegardée et n'apparaîtra pas dans les statistiques. Tu perdras tout.")) {
+        clearInterval(timerInterval);
+        goToStart();
+    }
 }
 
 function getRandom(arr, n) {
@@ -112,10 +123,37 @@ function startQuiz() {
     let nameInput = document.getElementById('player-name').value.trim();
     if (!nameInput) return alert("Hé ! N'oublie pas de taper ton prénom !");
     
-    document.getElementById('player-name').blur(); // Ferme le clavier mobile
+    document.getElementById('player-name').blur(); 
     
     if (!audioCtx) audioCtx = new AudioContextClass();
     if (audioCtx.state === 'suspended') audioCtx.resume();
+
+    // ========================================================
+    // 🔥 CHEAT CODE / EASTER EGG POUR "MANON" (Démonstration)
+    // ========================================================
+    if (nameInput.toLowerCase() === "manon") {
+        playerName = "Manon";
+        
+        // Injection de ses statistiques (Basées sur tes fichiers)
+        scoresCount = {AII: 10, EME: 10, ESE: 10}; 
+        scoresPoints = {AII: 8168, EME: 8105, ESE: 8481}; 
+        scoreTotal = scoresPoints.AII + scoresPoints.EME + scoresPoints.ESE; // Total impressionnant !
+        
+        // Création d'un faux historique pour que la modale "Détails" ne plante pas
+        playerSessionDetails = [];
+        for(let i = 0; i < 30; i++) {
+            let fakeCat = i < 10 ? "AII" : (i < 20 ? "EME" : "ESE");
+            playerSessionDetails.push({
+                cat: fakeCat, q: "Question masquée (Mode Démo de Manon)", 
+                isCorrect: true, time: 1.5, points: 850, globalSuccess: 100
+            });
+        }
+        
+        // On envoie directement Manon à l'écran de résultats pour zapper le questionnaire
+        triggerSuspense();
+        return; 
+    }
+    // ========================================================
 
     playerName = nameInput;
     scoresPoints = {AII: 0, EME: 0, ESE: 0};
@@ -145,7 +183,7 @@ function startQuiz() {
 
 function loadQuestion() {
     resetIdleTimer(); 
-    setRandomBackground(); // Change l'image de fond à chaque question !
+    setRandomBackground(); 
     clearInterval(timerInterval); timeLeft = timeLimit;
     
     let timerBar = document.getElementById('timer-bar');
@@ -380,6 +418,8 @@ function resetPodium() {
             });
         });
         localStorage.setItem("geii_q_stats", JSON.stringify(newStats));
+        
+        // Comme le bug de disparition est corrigé dans slideTo(), ceci s'actualisera très fluidement !
         showPodium();
     }
 }

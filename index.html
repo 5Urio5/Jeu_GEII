@@ -7,11 +7,12 @@
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <link rel="stylesheet" href="style.css">
-    <link rel="icon" href="data:,">
 </head>
 <body>
 
     <div id="screen-start" class="container active-screen">
+        <button id="btn-manual-screensaver" onclick="showScreensaver()" title="Activer l'écran de veille">🌙</button>
+
         <div class="logo-container">
             <img src="logo.png" alt="Logo GEII" onerror="this.style.display='none'; this.parentElement.innerHTML='<h2 style=\'color:black;margin:0\'>GEII - Univ Lille</h2>';">
         </div>
@@ -26,6 +27,8 @@
     </div>
 
     <div id="screen-game" class="container hidden slide-in-right">
+        <button class="btn-cancel-quiz" onclick="cancelQuiz()" title="Annuler la partie">❌</button>
+
         <div id="header-info">
             <span id="player-display">👤 Joueur <span style="color:#f1c40f; margin-left:15px;" id="live-score">0 pts</span></span>
             <span id="timer-text">⏱️ 30s</span>
@@ -39,6 +42,8 @@
     </div>
 
     <div id="screen-intermediate" class="container hidden slide-in-right">
+        <button class="btn-cancel-quiz" onclick="cancelQuiz()" title="Annuler la partie">❌</button>
+
         <h1 id="intermediate-title">Bonne réponse !</h1>
         <div id="intermediate-points">+ 850 pts</div>
         <div id="intermediate-streak">Série : 3 🔥</div>
@@ -86,11 +91,10 @@
         <div class="logo-container" style="margin-bottom: 50px;"><img src="logo.png" alt="Logo GEII"></div>
         <h1>LE MUR DES CHAMPIONS</h1>
         <div class="scroll-container"><div class="scroll-content" id="screensaver-scroll"></div></div>
-        <div class="touch-to-start">👆 Touchez l'écran pour jouer ! 👆</div>
+        <div class="touch-to-start">👆 Touchez l'écran pour jouer !</div>
     </div>
 
     <script src="questions.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
-

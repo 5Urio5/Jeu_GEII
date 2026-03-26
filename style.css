@@ -3,20 +3,13 @@
    ========================================== */
 body {
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-    
-    /* Image de fond par défaut (sera changée par le JS) */
     background-image: url('iut.jpg'); 
-    
-    /* Filtre sombre pour garantir que l'encadré vert et le texte restent ultra lisibles */
     background-color: rgba(15, 32, 39, 0.7); 
     background-blend-mode: overlay;
-    
-    /* Ajustements pour que l'image prenne tout l'écran */
     background-size: cover;
     background-position: center;
     background-attachment: fixed;
-    transition: background-image 0.5s ease-in-out; /* Transition douce entre les images */
-    
+    transition: background-image 0.5s ease-in-out;
     color: white; 
     margin: 0; 
     padding: 0;
@@ -46,6 +39,26 @@ body {
 }
 
 /* ==========================================
+   BOUTONS DE MAINTENANCE (Lune et Croix)
+   ========================================== */
+#btn-manual-screensaver, .btn-cancel-quiz {
+    position: absolute;
+    top: 20px;
+    right: 25px;
+    background: transparent;
+    border: none;
+    font-size: 1.8em;
+    cursor: pointer;
+    opacity: 0.5;
+    transition: opacity 0.2s, transform 0.2s;
+    z-index: 100;
+}
+#btn-manual-screensaver:hover, .btn-cancel-quiz:hover {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+/* ==========================================
    ANIMATIONS DE GLISSEMENT (Slides)
    ========================================== */
 .hidden { display: none !important; opacity: 0; pointer-events: none; }
@@ -69,7 +82,7 @@ input[type="text"]:focus { border: 2px solid #f1c40f; }
    BOUTONS GLOBAUX
    ========================================== */
 button.main-btn { 
-    background-color: #0b132b; /* Bleu très foncé pour faire ressortir le texte blanc sur le fond vert */
+    background-color: #0b132b; 
     color: #ffffff; 
     font-size: 1.5em; font-weight: bold; padding: 20px 40px; border: none; border-radius: 15px; 
     cursor: pointer; width: 100%; max-width: 400px; margin: 10px 5px; 
@@ -86,7 +99,6 @@ button.secondary-btn { background-color: #3498db; color: white; font-size: 1.2em
 #timer-container { width: 100%; height: 15px; background-color: rgba(255,255,255,0.2); border-radius: 10px; overflow: hidden; margin-bottom: 25px; box-shadow: inset 0 2px 5px rgba(0,0,0,0.3); }
 #timer-bar { height: 100%; width: 100%; background-color: #f1c40f; transition: width 1s linear, background-color 0.5s; }
 
-/* La boîte contenant la question */
 #question-text { 
     font-size: 1.6em; font-weight: bold; color: white; text-shadow: 1px 1px 2px rgba(0,0,0,0.3); margin: 0; 
     background-color: rgba(0,0,0,0.4); padding: 25px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); 
@@ -100,7 +112,6 @@ button.secondary-btn { background-color: #3498db; color: white; font-size: 1.2em
 .btn-correct { background-color: #2ecc71 !important; color: white !important; border-color: #27ae60 !important; }
 .btn-wrong { background-color: #e74c3c !important; color: white !important; border-color: #c0392b !important; }
 
-/* Jauge de progression des 30 questions */
 #progress-container { display: flex; justify-content: center; gap: 4px; margin-top: 25px; flex-wrap: wrap; }
 .progress-box { width: 18px; height: 10px; background-color: rgba(255,255,255,0.3); border-radius: 2px; }
 .prog-correct { background-color: #2ecc71; box-shadow: 0 0 5px #2ecc71; }
