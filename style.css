@@ -95,7 +95,19 @@ button.secondary-btn { background-color: #3498db; color: white; font-size: 1.2em
 /* ==========================================
    ÉCRAN DE JEU (Questions & Réponses)
    ========================================== */
-#header-info { display: flex; justify-content: space-between; font-size: 1.3em; font-weight: bold; margin-bottom: 15px; }
+/* Mise en page en Grille pour centrer parfaitement le chrono */
+#header-info { 
+    display: grid; 
+    grid-template-columns: 1fr auto 1fr; 
+    align-items: center; 
+    font-size: 1.3em; 
+    font-weight: bold; 
+    margin-bottom: 15px; 
+    width: 100%;
+}
+#player-display { text-align: left; }
+#timer-text { text-align: center; }
+
 #timer-container { width: 100%; height: 15px; background-color: rgba(255,255,255,0.2); border-radius: 10px; overflow: hidden; margin-bottom: 25px; box-shadow: inset 0 2px 5px rgba(0,0,0,0.3); }
 #timer-bar { height: 100%; width: 100%; background-color: #f1c40f; transition: width 1s linear, background-color 0.5s; }
 
