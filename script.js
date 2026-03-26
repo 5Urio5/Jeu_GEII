@@ -180,7 +180,6 @@ function startQuiz() {
     
     let selected = [];
     ['AII', 'EME', 'ESE'].forEach(cat => {
-        // LE FAMEUX BUG ETAIT ICI ! window.DB a été remis en DB tout court !
         let catQ = DB.filter(q => q.cat === cat);
         let qCom = getRandom(catQ.filter(q => q.diff === "Com"), 2);
         let qSTI = getRandom(catQ.filter(q => q.diff === "STI"), 3);
@@ -440,7 +439,14 @@ async function toggleKeep(playerId, isKept) {
     await set(ref(db, 'scores/' + playerId + '/keep'), isKept);
 }
 
+// 🔒 FONCTION SÉCURISÉE PAR MOT DE PASSE
 async function resetPodium() {
+    let pwd = prompt("⚠️ ZONE ADMINISTRATEUR ⚠️\nVeuillez entrer le mot de passe pour réinitialiser la base de données :");
+    if (pwd !== "iutgeii") {
+        if (pwd !== null) alert("❌ Mot de passe incorrect ! Action annulée.");
+        return;
+    }
+
     if(confirm("⚠️ Attention, cela effacera tous les scores du réseau mondial (SAUF ceux cochés '📌 Conserver'). Continuer ?")) {
         const snapshot = await get(ref(db, 'scores'));
         if (snapshot.exists()) {
@@ -457,7 +463,14 @@ async function resetPodium() {
     }
 }
 
+// 🔒 FONCTION SÉCURISÉE PAR MOT DE PASSE
 async function downloadExcel() {
+    let pwd = prompt("⚠️ ZONE ADMINISTRATEUR ⚠️\nVeuillez entrer le mot de passe pour télécharger le rapport Excel :");
+    if (pwd !== "iutgeii") {
+        if (pwd !== null) alert("❌ Mot de passe incorrect ! Action annulée.");
+        return;
+    }
+
     const snapshot = await get(ref(db, 'scores'));
     if (!snapshot.exists()) return alert("Aucun score enregistré sur le réseau pour le moment !");
     
