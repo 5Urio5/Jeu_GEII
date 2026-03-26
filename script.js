@@ -152,7 +152,7 @@ function startQuiz() {
     if (audioCtx.state === 'suspended') audioCtx.resume();
 
     // ========================================================
-    // 🔥 CHEAT CODE / EASTER EGG POUR "MANON" (Stats du fichier Excel)
+    // 🔥 CHEAT CODE / EASTER EGG POUR "MANON"
     // ========================================================
     if (nameInput.toLowerCase() === "manon") {
         playerName = "Manon";
@@ -180,7 +180,8 @@ function startQuiz() {
     
     let selected = [];
     ['AII', 'EME', 'ESE'].forEach(cat => {
-        let catQ = window.DB.filter(q => q.cat === cat);
+        // LE FAMEUX BUG ETAIT ICI ! window.DB a été remis en DB tout court !
+        let catQ = DB.filter(q => q.cat === cat);
         let qCom = getRandom(catQ.filter(q => q.diff === "Com"), 2);
         let qSTI = getRandom(catQ.filter(q => q.diff === "STI"), 3);
         let qBU1 = getRandom(catQ.filter(q => q.diff === "BU1"), 3);
