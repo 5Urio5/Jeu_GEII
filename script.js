@@ -1,4 +1,21 @@
-/* global DB, confetti, XLSX */ // Cette ligne indique à VS Code que ces variables viennent d'autres fichiers !
+/* global DB, confetti, XLSX */ // Indique à VS Code que ces variables viennent d'autres fichiers
+
+// ==========================================
+// FONDS D'ÉCRAN DYNAMIQUES
+// ==========================================
+// Liste de tes images (elles doivent être dans le même dossier que le fichier script.js)
+const bgImages = [
+    'appmeas.jpg',
+    'intérieur_iut.jpg',
+    'iut.jpg',
+    'kart.jpg',
+    'platine.jpg'
+];
+
+function setRandomBackground() {
+    const randomImg = bgImages[Math.floor(Math.random() * bgImages.length)];
+    document.body.style.backgroundImage = `url('${randomImg}')`;
+}
 
 // ==========================================
 // VARIABLES DE JEU
@@ -23,9 +40,8 @@ let idleTimer;
 const IDLE_TIME = 120000; 
 
 // ==========================================
-// GESTION AUDIO (Correction de l'erreur VS Code)
+// GESTION AUDIO
 // ==========================================
-// On utilise 'AudioContextClass' au lieu de 'AudioContext' pour ne pas froisser VS Code
 const AudioContextClass = window.AudioContext || window.webkitAudioContext;
 let audioCtx;
 
@@ -64,7 +80,7 @@ function playSound(type) {
 }
 
 // ==========================================
-// LOGIQUE INTERFACE
+// LOGIQUE INTERFACE & SLIDES
 // ==========================================
 function slideTo(screenId) {
     const active = document.querySelector('.active-screen');
@@ -80,6 +96,7 @@ function slideTo(screenId) {
 
 function goToStart() {
     document.getElementById('player-name').value = '';
+    setRandomBackground(); // Change l'image de fond pour le nouveau joueur
     resetIdleTimer(); slideTo('screen-start');
     setTimeout(() => { document.getElementById('player-name').focus(); }, 500);
 }
@@ -88,6 +105,9 @@ function getRandom(arr, n) {
     let shuffled = [...arr].sort(() => 0.5 - Math.random()); return shuffled.slice(0, n);
 }
 
+// ==========================================
+// MOTEUR DU QUIZ
+// ==========================================
 function startQuiz() {
     let nameInput = document.getElementById('player-name').value.trim();
     if (!nameInput) return alert("Hé ! N'oublie pas de taper ton prénom !");
@@ -124,7 +144,9 @@ function startQuiz() {
 }
 
 function loadQuestion() {
-    resetIdleTimer(); clearInterval(timerInterval); timeLeft = timeLimit;
+    resetIdleTimer(); 
+    setRandomBackground(); // Change l'image de fond à chaque question !
+    clearInterval(timerInterval); timeLeft = timeLimit;
     
     let timerBar = document.getElementById('timer-bar');
     timerBar.style.width = "100%"; timerBar.style.backgroundColor = "#2ecc71"; 
@@ -261,7 +283,7 @@ function showResults() {
 }
 
 // ==========================================
-// SAUVEGARDE, PODIUM & DETAILS
+// SAUVEGARDE, PODIUM & EXPORT
 // ==========================================
 function saveScoreJSON(name, totalScore, profil) {
     let newEntry = {
@@ -387,24 +409,21 @@ function downloadExcel() {
 }
 
 // ==========================================
-// GESTION DE LA TOUCHE "ENTRÉE"
+// GESTION CLAVIER (Touche Entrée)
 // ==========================================
 document.addEventListener('keydown', function(event) {
     if (event.key === 'Enter') {
         const activeScreen = document.querySelector('.active-screen');
-        // Si on est sur l'écran d'accueil
         if (activeScreen && activeScreen.id === 'screen-start') {
             startQuiz();
-        } 
-        // Si on est sur l'écran "Le saviez-vous ?"
-        else if (activeScreen && activeScreen.id === 'screen-intermediate') {
+        } else if (activeScreen && activeScreen.id === 'screen-intermediate') {
             goToNextQuestion();
         }
     }
 });
 
 // ==========================================
-// SCREENSAVER
+// ÉCRAN DE VEILLE (Screensaver)
 // ==========================================
 function resetIdleTimer() { clearTimeout(idleTimer); hideScreensaver(); idleTimer = setTimeout(showScreensaver, IDLE_TIME); }
 
