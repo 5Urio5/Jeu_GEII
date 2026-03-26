@@ -1,4 +1,39 @@
-/* global DB, confetti, XLSX */
+// ==========================================
+// FIREBASE - CONNEXION BASE DE DONNÉES TEMPS RÉEL
+// ==========================================
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
+import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-analytics.js";
+import { getDatabase, ref, push, get, set } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyA5xccoSduwPvhrnR769i_2Fhp9zW63C5M",
+  authDomain: "jeu-geii.firebaseapp.com",
+  projectId: "jeu-geii",
+  storageBucket: "jeu-geii.firebasestorage.app",
+  messagingSenderId: "891268021614",
+  appId: "1:891268021614:web:18ff4b03d9ea07f284157f",
+  measurementId: "G-TMHEK2JKFS"
+};
+
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
+const db = getDatabase(app);
+
+// ==========================================
+// EXPOSITION DES FONCTIONS AU HTML (Obligatoire pour les modules)
+// ==========================================
+window.startQuiz = startQuiz;
+window.goToStart = goToStart;
+window.cancelQuiz = cancelQuiz;
+window.showPodium = showPodium;
+window.openModal = openModal;
+window.closeModal = closeModal;
+window.toggleKeep = toggleKeep;
+window.resetPodium = resetPodium;
+window.downloadExcel = downloadExcel;
+window.showScreensaver = showScreensaver;
+window.hideScreensaver = hideScreensaver;
+window.goToNextQuestion = goToNextQuestion;
 
 // ==========================================
 // FONDS D'ÉCRAN DYNAMIQUES
@@ -83,8 +118,6 @@ function playSound(type) {
 // ==========================================
 function slideTo(screenId) {
     const active = document.querySelector('.active-screen');
-    // CORRECTION DU BUG DE RÉINITIALISATION : 
-    // Si on demande d'afficher l'écran qui est DÉJÀ affiché, on ne fait rien pour éviter qu'il ne disparaisse !
     if (active && active.id === screenId) return; 
 
     if (active) {
@@ -104,9 +137,8 @@ function goToStart() {
     setTimeout(() => { document.getElementById('player-name').focus(); }, 500);
 }
 
-// Nouvelle fonction pour annuler la partie (Bouton Croix)
 function cancelQuiz() {
-    if (confirm("⚠️ Es-tu sûr de vouloir annuler la partie en cours ?\n\nTa progression ne sera pas sauvegardée et n'apparaîtra pas dans les statistiques. Tu perdras tout.")) {
+    if (confirm("⚠️ Es-tu sûr de vouloir annuler la partie en cours ?\n\nTa progression ne sera pas sauvegardée et n'apparaîtra pas dans le classement. Tu perdras tout.")) {
         clearInterval(timerInterval);
         goToStart();
     }
@@ -129,27 +161,22 @@ function startQuiz() {
     if (audioCtx.state === 'suspended') audioCtx.resume();
 
     // ========================================================
-    // 🔥 CHEAT CODE / EASTER EGG POUR "MANON" (Démonstration)
+    // 🔥 CHEAT CODE / EASTER EGG POUR "MANON" (Mode Démo)
     // ========================================================
     if (nameInput.toLowerCase() === "manon") {
         playerName = "Manon";
-        
-        // Injection de ses statistiques (Basées sur tes fichiers)
         scoresCount = {AII: 10, EME: 10, ESE: 10}; 
         scoresPoints = {AII: 8168, EME: 8105, ESE: 8481}; 
-        scoreTotal = scoresPoints.AII + scoresPoints.EME + scoresPoints.ESE; // Total impressionnant !
+        scoreTotal = scoresPoints.AII + scoresPoints.EME + scoresPoints.ESE; 
         
-        // Création d'un faux historique pour que la modale "Détails" ne plante pas
         playerSessionDetails = [];
         for(let i = 0; i < 30; i++) {
             let fakeCat = i < 10 ? "AII" : (i < 20 ? "EME" : "ESE");
             playerSessionDetails.push({
-                cat: fakeCat, q: "Question masquée (Mode Démo de Manon)", 
-                isCorrect: true, time: 1.5, points: 850, globalSuccess: 100
+                cat: fakeCat, q: `Question masquée ${i+1} (Mode Démo)`, 
+                isCorrect: true, time: 1.5, points: 850
             });
         }
-        
-        // On envoie directement Manon à l'écran de résultats pour zapper le questionnaire
         triggerSuspense();
         return; 
     }
@@ -162,7 +189,7 @@ function startQuiz() {
     
     let selected = [];
     ['AII', 'EME', 'ESE'].forEach(cat => {
-        let catQ = DB.filter(q => q.cat === cat);
+        let catQ = window.DB.filter(q => q.cat === cat);
         let qCom = getRandom(catQ.filter(q => q.diff === "Com"), 2);
         let qSTI = getRandom(catQ.filter(q => q.diff === "STI"), 3);
         let qBU1 = getRandom(catQ.filter(q => q.diff === "BU1"), 3);
@@ -231,13 +258,7 @@ function processAnswer(selectedIndex, correctIndex, clickedBtn) {
     let timeTaken = timeLimit - timeLeft;
     let pointsGained = 0;
     
-    let globalQStats = JSON.parse(localStorage.getItem('geii_q_stats')) || {};
-    let qKey = qData.q; 
-    if (!globalQStats[qKey]) globalQStats[qKey] = { asked: 0, correct: 0, cat: qData.cat };
-    globalQStats[qKey].asked++;
-    
     if (isCorrect) {
-        globalQStats[qKey].correct++;
         scoresCount[qData.cat]++; currentStreak++; playSound('correct');
         if(clickedBtn) clickedBtn.classList.add('btn-correct');
         box.classList.add('prog-correct');
@@ -252,11 +273,8 @@ function processAnswer(selectedIndex, correctIndex, clickedBtn) {
         box.classList.add('prog-wrong');
     }
     
-    localStorage.setItem('geii_q_stats', JSON.stringify(globalQStats));
-    
     playerSessionDetails.push({
-        cat: qData.cat, q: qData.q, isCorrect: isCorrect, time: timeTaken, points: pointsGained,
-        globalSuccess: Math.round((globalQStats[qKey].correct / globalQStats[qKey].asked) * 100)
+        cat: qData.cat, q: qData.q, isCorrect: isCorrect, time: timeTaken, points: pointsGained
     });
 
     document.getElementById('live-score').innerText = `${scoreTotal} pts`;
@@ -298,7 +316,7 @@ function goToNextQuestion() {
 
 function triggerSuspense() {
     slideTo('screen-suspense'); playSound('drumroll');
-    setTimeout(() => { showResults(); confetti({ particleCount: 150, spread: 100, origin: { y: 0.6 }, zIndex: 10000 }); }, 3000);
+    setTimeout(() => { showResults(); window.confetti({ particleCount: 150, spread: 100, origin: { y: 0.6 }, zIndex: 10000 }); }, 3000);
 }
 
 function showResults() {
@@ -316,30 +334,39 @@ function showResults() {
     document.getElementById('scores-display').innerHTML = htmlScores;
     document.getElementById('best-path').innerText = `👉 PARCOURS CONSEILLÉ : ${bestCat} 👈`;
 
-    saveScoreJSON(playerName, scoreTotal, bestCat);
+    saveScoreFirebase(playerName, scoreTotal, bestCat);
     slideTo('screen-results');
 }
 
 // ==========================================
-// SAUVEGARDE, PODIUM & EXPORT
+// FIREBASE : SAUVEGARDE, PODIUM & EXPORT
 // ==========================================
-function saveScoreJSON(name, totalScore, profil) {
+function saveScoreFirebase(name, totalScore, profil) {
     let newEntry = {
         "Candidat": name, "Score Points": totalScore, "Profil": profil,
         "ScoresCount": scoresCount, "ScoresPoints": scoresPoints, "SessionDetails": playerSessionDetails,
         "keep": false 
     };
-    let existingData = JSON.parse(localStorage.getItem("geii_scores_json")) || [];
-    existingData.push(newEntry);
-    localStorage.setItem("geii_scores_json", JSON.stringify(existingData));
+    push(ref(db, 'scores'), newEntry);
 }
 
-function showPodium() {
+async function showPodium() {
     resetIdleTimer();
-    let data = JSON.parse(localStorage.getItem("geii_scores_json")) || [];
-    data.sort((a, b) => b["Score Points"] - a["Score Points"]);
+    slideTo('screen-podium');
+    let tbody = document.getElementById('podium-body'); 
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#bdc3c7;">Chargement du réseau Mondial... 📡</td></tr>';
     
-    let tbody = document.getElementById('podium-body'); tbody.innerHTML = '';
+    const snapshot = await get(ref(db, 'scores'));
+    let data = [];
+    if (snapshot.exists()) {
+        const scoresObj = snapshot.val();
+        for (let key in scoresObj) {
+            data.push({ id: key, ...scoresObj[key] });
+        }
+    }
+    
+    data.sort((a, b) => b["Score Points"] - a["Score Points"]);
+    tbody.innerHTML = '';
     
     if(data.length === 0) {
         tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#bdc3c7;">Aucun joueur enregistré.</td></tr>';
@@ -351,23 +378,37 @@ function showPodium() {
                 <td>${joueur.Candidat}</td>
                 <td>${joueur["Score Points"]}</td>
                 <td>${joueur.Profil}</td>
-                <td><button class="btn-details" onclick='openModal(${index})'>Détails 🔍</button></td>
+                <td><button class="btn-details" onclick="openModal('${joueur.id}')">Détails 🔍</button></td>
             </tr>`;
         });
     }
-    slideTo('screen-podium');
 }
 
-function openModal(playerIndex) {
-    let data = JSON.parse(localStorage.getItem("geii_scores_json")) || [];
-    data.sort((a, b) => b["Score Points"] - a["Score Points"]);
-    let player = data[playerIndex];
+async function openModal(playerId) {
+    const snapshot = await get(ref(db, 'scores'));
+    if(!snapshot.exists()) return;
     
+    let scoresObj = snapshot.val();
+    let allPlayers = Object.values(scoresObj);
+    let player = { id: playerId, ...scoresObj[playerId] };
+    
+    // Calcul dynamique des statistiques mondiales pour la transparence
+    let globalStats = {};
+    allPlayers.forEach(p => {
+        if(p.SessionDetails) {
+            p.SessionDetails.forEach(q => {
+                if(!globalStats[q.q]) globalStats[q.q] = { asked: 0, correct: 0 };
+                globalStats[q.q].asked++;
+                if(q.isCorrect) globalStats[q.q].correct++;
+            });
+        }
+    });
+
     let isChecked = player.keep ? "checked" : "";
     document.getElementById('modal-header-content').innerHTML = `
         <h2 style="color:#f1c40f; margin-top:0; display:inline-block;">Analyse de : ${player.Candidat}</h2>
         <label class="keep-label">
-            <input type="checkbox" onchange="toggleKeep(${playerIndex}, this.checked)" ${isChecked}> 
+            <input type="checkbox" onchange="toggleKeep('${player.id}', this.checked)" ${isChecked}> 
             📌 Conserver
         </label>
     `;
@@ -377,7 +418,10 @@ function openModal(playerIndex) {
     player.SessionDetails.forEach(q => {
         let resIcon = q.isCorrect ? `<span class="correct-cell">✅</span>` : `<span class="wrong-cell">❌</span>`;
         let ptsClass = q.isCorrect ? "correct-cell" : "";
-        let successColor = q.globalSuccess > 70 ? "#2ecc71" : (q.globalSuccess < 40 ? "#e74c3c" : "#f1c40f");
+        
+        let successPct = globalStats[q.q] ? Math.round((globalStats[q.q].correct / globalStats[q.q].asked) * 100) : 100;
+        if(player.Candidat === "Manon") successPct = 100; // Cheat code
+        let successColor = successPct > 70 ? "#2ecc71" : (successPct < 40 ? "#e74c3c" : "#f1c40f");
         
         tbody.innerHTML += `<tr>
             <td><strong>${q.cat}</strong></td>
@@ -385,7 +429,7 @@ function openModal(playerIndex) {
             <td style="text-align:center;">${resIcon}</td>
             <td style="text-align:center;">${q.time}s</td>
             <td style="text-align:center;" class="${ptsClass}">${q.points}</td>
-            <td style="text-align:center; color:${successColor}; font-weight:bold;">${q.globalSuccess}%</td>
+            <td style="text-align:center; color:${successColor}; font-weight:bold;">${successPct}%</td>
         </tr>`;
     });
     
@@ -394,58 +438,63 @@ function openModal(playerIndex) {
 
 function closeModal() { document.getElementById('details-modal').classList.remove('show'); }
 
-function toggleKeep(playerIndex, isKept) {
-    let data = JSON.parse(localStorage.getItem("geii_scores_json")) || [];
-    data.sort((a, b) => b["Score Points"] - a["Score Points"]);
-    data[playerIndex].keep = isKept;
-    localStorage.setItem("geii_scores_json", JSON.stringify(data));
+async function toggleKeep(playerId, isKept) {
+    await set(ref(db, 'scores/' + playerId + '/keep'), isKept);
 }
 
-function resetPodium() {
-    if(confirm("Attention, cela effacera tous les scores (SAUF ceux cochés '📌 Conserver'). Les statistiques globales seront recalculées. Continuer ?")) {
-        let data = JSON.parse(localStorage.getItem("geii_scores_json")) || [];
-        let keptData = data.filter(p => p.keep === true); 
-        
-        localStorage.setItem("geii_scores_json", JSON.stringify(keptData));
-        
-        let newStats = {};
-        keptData.forEach(p => {
-            p.SessionDetails.forEach(q => {
-                let qKey = q.q;
-                if(!newStats[qKey]) newStats[qKey] = { asked: 0, correct: 0, cat: q.cat };
-                newStats[qKey].asked++;
-                if(q.isCorrect) newStats[qKey].correct++;
-            });
-        });
-        localStorage.setItem("geii_q_stats", JSON.stringify(newStats));
-        
-        // Comme le bug de disparition est corrigé dans slideTo(), ceci s'actualisera très fluidement !
+async function resetPodium() {
+    if(confirm("⚠️ Attention, cela effacera tous les scores du réseau mondial (SAUF ceux cochés '📌 Conserver'). Continuer ?")) {
+        const snapshot = await get(ref(db, 'scores'));
+        if (snapshot.exists()) {
+            const scoresObj = snapshot.val();
+            let keptScores = {};
+            for (let key in scoresObj) {
+                if (scoresObj[key].keep) {
+                    keptScores[key] = scoresObj[key];
+                }
+            }
+            await set(ref(db, 'scores'), keptScores);
+        }
         showPodium();
     }
 }
 
-function downloadExcel() {
-    let dataJoueurs = JSON.parse(localStorage.getItem("geii_scores_json")) || [];
-    let dataStats = JSON.parse(localStorage.getItem("geii_q_stats")) || {};
-    if (dataJoueurs.length === 0) return alert("Aucun score enregistré pour le moment !");
+async function downloadExcel() {
+    const snapshot = await get(ref(db, 'scores'));
+    if (!snapshot.exists()) return alert("Aucun score enregistré sur le réseau pour le moment !");
     
-    let wb = XLSX.utils.book_new();
+    let scoresObj = snapshot.val();
+    let dataJoueurs = Object.values(scoresObj);
+    dataJoueurs.sort((a, b) => b["Score Points"] - a["Score Points"]);
+    
+    let globalStats = {};
+    dataJoueurs.forEach(p => {
+        if(p.SessionDetails) {
+            p.SessionDetails.forEach(q => {
+                if(!globalStats[q.q]) globalStats[q.q] = { cat: q.cat, asked: 0, correct: 0 };
+                globalStats[q.q].asked++;
+                if(q.isCorrect) globalStats[q.q].correct++;
+            });
+        }
+    });
+
+    let wb = window.XLSX.utils.book_new();
     let exportJoueurs = dataJoueurs.map(j => ({
         "Candidat": j.Candidat, "Score Global": j["Score Points"], "Profil": j.Profil,
         "AII (Bonnes Rép.)": j.ScoresCount.AII + "/10", "AII (Points)": j.ScoresPoints.AII,
         "EME (Bonnes Rép.)": j.ScoresCount.EME + "/10", "EME (Points)": j.ScoresPoints.EME,
         "ESE (Bonnes Rép.)": j.ScoresCount.ESE + "/10", "ESE (Points)": j.ScoresPoints.ESE
     }));
-    let ws1 = XLSX.utils.json_to_sheet(exportJoueurs); XLSX.utils.book_append_sheet(wb, ws1, "Classement Joueurs");
+    let ws1 = window.XLSX.utils.json_to_sheet(exportJoueurs); window.XLSX.utils.book_append_sheet(wb, ws1, "Classement Joueurs");
     
-    let exportStats = Object.keys(dataStats).map(qText => {
-        let st = dataStats[qText];
+    let exportStats = Object.keys(globalStats).map(qText => {
+        let st = globalStats[qText];
         return { "Catégorie": st.cat, "Question": qText, "Fois posée": st.asked, "Fois réussie": st.correct, "Taux de réussite (%)": Math.round((st.correct / st.asked) * 100) };
     });
     exportStats.sort((a, b) => b["Taux de réussite (%)"] - a["Taux de réussite (%)"]);
     
-    let ws2 = XLSX.utils.json_to_sheet(exportStats); XLSX.utils.book_append_sheet(wb, ws2, "Statistiques Questions");
-    XLSX.writeFile(wb, "Rapport_Analytique_GEII.xlsx");
+    let ws2 = window.XLSX.utils.json_to_sheet(exportStats); window.XLSX.utils.book_append_sheet(wb, ws2, "Statistiques Questions");
+    window.XLSX.writeFile(wb, "Rapport_Analytique_GEII_Cloud.xlsx");
 }
 
 // ==========================================
@@ -463,23 +512,28 @@ document.addEventListener('keydown', function(event) {
 });
 
 // ==========================================
-// ÉCRAN DE VEILLE (Screensaver)
+// ÉCRAN DE VEILLE (Screensaver Réseau)
 // ==========================================
 function resetIdleTimer() { clearTimeout(idleTimer); hideScreensaver(); idleTimer = setTimeout(showScreensaver, IDLE_TIME); }
 
-function showScreensaver() {
+async function showScreensaver() {
     const active = document.querySelector('.active-screen');
     if(active && (active.id === 'screen-start' || active.id === 'screen-podium')) {
         let ss = document.getElementById('screensaver');
         let scrollBox = document.getElementById('screensaver-scroll');
-        let data = JSON.parse(localStorage.getItem("geii_scores_json")) || [];
+        
+        const snapshot = await get(ref(db, 'scores'));
+        let data = [];
+        if (snapshot.exists()) {
+            Object.values(snapshot.val()).forEach(p => data.push(p));
+        }
         data.sort((a, b) => b["Score Points"] - a["Score Points"]);
         
         if (data.length > 0) {
             let html = "";
             data.slice(0, 10).forEach((j, i) => { html += `<div style="margin-bottom:20px;">#${i+1} <strong>${j.Candidat}</strong> - ${j["Score Points"]} pts (${j.Profil})</div>`; });
             scrollBox.innerHTML = html;
-        } else { scrollBox.innerHTML = "<div>Soyez le premier à jouer !</div>"; }
+        } else { scrollBox.innerHTML = "<div>Soyez le premier à jouer sur le réseau !</div>"; }
         ss.classList.remove('hidden');
     } else { resetIdleTimer(); }
 }
