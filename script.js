@@ -1,3 +1,5 @@
+/* global DB, confetti, XLSX */
+
 // ==========================================
 // FIREBASE - CONNEXION BASE DE DONNÉES TEMPS RÉEL
 // ==========================================
@@ -8,6 +10,8 @@ import { getDatabase, ref, push, get, set } from "https://www.gstatic.com/fireba
 const firebaseConfig = {
   apiKey: "AIzaSyA5xccoSduwPvhrnR769i_2Fhp9zW63C5M",
   authDomain: "jeu-geii.firebaseapp.com",
+  // Ligne indispensable pour les bases de données européennes Firebase :
+  databaseURL: "https://jeu-geii-default-rtdb.europe-west1.firebasedatabase.app",
   projectId: "jeu-geii",
   storageBucket: "jeu-geii.firebasestorage.app",
   messagingSenderId: "891268021614",
@@ -19,9 +23,7 @@ const app = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
 const db = getDatabase(app);
 
-// ==========================================
-// EXPOSITION DES FONCTIONS AU HTML (Obligatoire pour les modules)
-// ==========================================
+// Exposition des fonctions au HTML
 window.startQuiz = startQuiz;
 window.goToStart = goToStart;
 window.cancelQuiz = cancelQuiz;
@@ -38,13 +40,7 @@ window.goToNextQuestion = goToNextQuestion;
 // ==========================================
 // FONDS D'ÉCRAN DYNAMIQUES
 // ==========================================
-const bgImages = [
-    'appmeas.jpg',
-    'intérieur_iut.jpg',
-    'iut.jpg',
-    'kart.jpg',
-    'platine.jpg'
-];
+const bgImages = ['appmeas.jpg', 'intérieur_iut.jpg', 'iut.jpg', 'kart.jpg', 'platine.jpg'];
 
 function setRandomBackground() {
     const randomImg = bgImages[Math.floor(Math.random() * bgImages.length)];
@@ -57,19 +53,15 @@ function setRandomBackground() {
 let playerName = "";
 let currentQuestions = [];
 let currentQIndex = 0;
-
 let scoresPoints = {AII: 0, EME: 0, ESE: 0};
 let scoresCount = {AII: 0, EME: 0, ESE: 0};
 let scoreTotal = 0;
-
 let currentStreak = 0;
 let playerSessionDetails = []; 
-
 let totalQuestions = 30; 
 let timeLimit = 30; 
 let timeLeft = timeLimit;
 let timerInterval;
-
 let idleTimer; 
 const IDLE_TIME = 120000; 
 
@@ -161,13 +153,13 @@ function startQuiz() {
     if (audioCtx.state === 'suspended') audioCtx.resume();
 
     // ========================================================
-    // 🔥 CHEAT CODE / EASTER EGG POUR "MANON" (Mode Démo)
+    // 🔥 CHEAT CODE / EASTER EGG POUR "MANON" (Stats du fichier Excel)
     // ========================================================
     if (nameInput.toLowerCase() === "manon") {
         playerName = "Manon";
-        scoresCount = {AII: 10, EME: 10, ESE: 10}; 
-        scoresPoints = {AII: 8168, EME: 8105, ESE: 8481}; 
-        scoreTotal = scoresPoints.AII + scoresPoints.EME + scoresPoints.ESE; 
+        scoresCount = {AII: 5, EME: 7, ESE: 6}; 
+        scoresPoints = {AII: 4433, EME: 6451, ESE: 5567}; 
+        scoreTotal = 16451; 
         
         playerSessionDetails = [];
         for(let i = 0; i < 30; i++) {
@@ -262,7 +254,6 @@ function processAnswer(selectedIndex, correctIndex, clickedBtn) {
         scoresCount[qData.cat]++; currentStreak++; playSound('correct');
         if(clickedBtn) clickedBtn.classList.add('btn-correct');
         box.classList.add('prog-correct');
-        
         pointsGained = Math.round((timeLeft / timeLimit) * 500) + 500;
         scoreTotal += pointsGained; scoresPoints[qData.cat] += pointsGained;
     } else {
@@ -354,86 +345,94 @@ async function showPodium() {
     resetIdleTimer();
     slideTo('screen-podium');
     let tbody = document.getElementById('podium-body'); 
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#bdc3c7;">Chargement du réseau Mondial... 📡</td></tr>';
     
-    const snapshot = await get(ref(db, 'scores'));
-    let data = [];
-    if (snapshot.exists()) {
-        const scoresObj = snapshot.val();
-        for (let key in scoresObj) {
-            data.push({ id: key, ...scoresObj[key] });
+    // Ajout du spinner de chargement stylisé !
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#bdc3c7;">Chargement <div class="spinner"></div></td></tr>';
+    
+    try {
+        const snapshot = await get(ref(db, 'scores'));
+        let data = [];
+        if (snapshot.exists()) {
+            const scoresObj = snapshot.val();
+            for (let key in scoresObj) {
+                data.push({ id: key, ...scoresObj[key] });
+            }
         }
-    }
-    
-    data.sort((a, b) => b["Score Points"] - a["Score Points"]);
-    tbody.innerHTML = '';
-    
-    if(data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#bdc3c7;">Aucun joueur enregistré.</td></tr>';
-    } else {
-        data.forEach((joueur, index) => {
-            let medaille = index === 0 ? "🥇" : (index === 1 ? "🥈" : (index === 2 ? "🥉" : ""));
-            tbody.innerHTML += `<tr>
-                <td>${medaille} ${index+1}</td>
-                <td>${joueur.Candidat}</td>
-                <td>${joueur["Score Points"]}</td>
-                <td>${joueur.Profil}</td>
-                <td><button class="btn-details" onclick="openModal('${joueur.id}')">Détails 🔍</button></td>
-            </tr>`;
-        });
+        
+        data.sort((a, b) => b["Score Points"] - a["Score Points"]);
+        tbody.innerHTML = '';
+        
+        if(data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#bdc3c7;">Aucun joueur enregistré.</td></tr>';
+        } else {
+            data.forEach((joueur, index) => {
+                let medaille = index === 0 ? "🥇" : (index === 1 ? "🥈" : (index === 2 ? "🥉" : ""));
+                tbody.innerHTML += `<tr>
+                    <td>${medaille} ${index+1}</td>
+                    <td>${joueur.Candidat}</td>
+                    <td>${joueur["Score Points"]}</td>
+                    <td>${joueur.Profil}</td>
+                    <td><button class="btn-details" onclick="openModal('${joueur.id}')">Détails 🔍</button></td>
+                </tr>`;
+            });
+        }
+    } catch (error) {
+        console.error("Erreur Firebase:", error);
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#e74c3c;">Erreur de connexion réseau ❌</td></tr>';
     }
 }
 
 async function openModal(playerId) {
-    const snapshot = await get(ref(db, 'scores'));
-    if(!snapshot.exists()) return;
-    
-    let scoresObj = snapshot.val();
-    let allPlayers = Object.values(scoresObj);
-    let player = { id: playerId, ...scoresObj[playerId] };
-    
-    // Calcul dynamique des statistiques mondiales pour la transparence
-    let globalStats = {};
-    allPlayers.forEach(p => {
-        if(p.SessionDetails) {
-            p.SessionDetails.forEach(q => {
-                if(!globalStats[q.q]) globalStats[q.q] = { asked: 0, correct: 0 };
-                globalStats[q.q].asked++;
-                if(q.isCorrect) globalStats[q.q].correct++;
-            });
-        }
-    });
+    try {
+        const snapshot = await get(ref(db, 'scores'));
+        if(!snapshot.exists()) return;
+        
+        let scoresObj = snapshot.val();
+        let allPlayers = Object.values(scoresObj);
+        let player = { id: playerId, ...scoresObj[playerId] };
+        
+        let globalStats = {};
+        allPlayers.forEach(p => {
+            if(p.SessionDetails) {
+                p.SessionDetails.forEach(q => {
+                    if(!globalStats[q.q]) globalStats[q.q] = { asked: 0, correct: 0 };
+                    globalStats[q.q].asked++;
+                    if(q.isCorrect) globalStats[q.q].correct++;
+                });
+            }
+        });
 
-    let isChecked = player.keep ? "checked" : "";
-    document.getElementById('modal-header-content').innerHTML = `
-        <h2 style="color:#f1c40f; margin-top:0; display:inline-block;">Analyse de : ${player.Candidat}</h2>
-        <label class="keep-label">
-            <input type="checkbox" onchange="toggleKeep('${player.id}', this.checked)" ${isChecked}> 
-            📌 Conserver
-        </label>
-    `;
-    
-    let tbody = document.getElementById('modal-table-body'); tbody.innerHTML = '';
-    
-    player.SessionDetails.forEach(q => {
-        let resIcon = q.isCorrect ? `<span class="correct-cell">✅</span>` : `<span class="wrong-cell">❌</span>`;
-        let ptsClass = q.isCorrect ? "correct-cell" : "";
+        let isChecked = player.keep ? "checked" : "";
+        document.getElementById('modal-header-content').innerHTML = `
+            <h2 style="color:#f1c40f; margin-top:0; display:inline-block;">Analyse de : ${player.Candidat}</h2>
+            <label class="keep-label">
+                <input type="checkbox" onchange="toggleKeep('${player.id}', this.checked)" ${isChecked}> 
+                📌 Conserver
+            </label>
+        `;
         
-        let successPct = globalStats[q.q] ? Math.round((globalStats[q.q].correct / globalStats[q.q].asked) * 100) : 100;
-        if(player.Candidat === "Manon") successPct = 100; // Cheat code
-        let successColor = successPct > 70 ? "#2ecc71" : (successPct < 40 ? "#e74c3c" : "#f1c40f");
+        let tbody = document.getElementById('modal-table-body'); tbody.innerHTML = '';
         
-        tbody.innerHTML += `<tr>
-            <td><strong>${q.cat}</strong></td>
-            <td style="text-align:left;">${q.q}</td>
-            <td style="text-align:center;">${resIcon}</td>
-            <td style="text-align:center;">${q.time}s</td>
-            <td style="text-align:center;" class="${ptsClass}">${q.points}</td>
-            <td style="text-align:center; color:${successColor}; font-weight:bold;">${successPct}%</td>
-        </tr>`;
-    });
-    
-    document.getElementById('details-modal').classList.add('show');
+        player.SessionDetails.forEach(q => {
+            let resIcon = q.isCorrect ? `<span class="correct-cell">✅</span>` : `<span class="wrong-cell">❌</span>`;
+            let ptsClass = q.isCorrect ? "correct-cell" : "";
+            
+            let successPct = globalStats[q.q] ? Math.round((globalStats[q.q].correct / globalStats[q.q].asked) * 100) : 100;
+            if(player.Candidat === "Manon") successPct = 100; 
+            let successColor = successPct > 70 ? "#2ecc71" : (successPct < 40 ? "#e74c3c" : "#f1c40f");
+            
+            tbody.innerHTML += `<tr>
+                <td><strong>${q.cat}</strong></td>
+                <td style="text-align:left;">${q.q}</td>
+                <td style="text-align:center;">${resIcon}</td>
+                <td style="text-align:center;">${q.time}s</td>
+                <td style="text-align:center;" class="${ptsClass}">${q.points}</td>
+                <td style="text-align:center; color:${successColor}; font-weight:bold;">${successPct}%</td>
+            </tr>`;
+        });
+        
+        document.getElementById('details-modal').classList.add('show');
+    } catch(e) { console.error(e); }
 }
 
 function closeModal() { document.getElementById('details-modal').classList.remove('show'); }
@@ -522,19 +521,21 @@ async function showScreensaver() {
         let ss = document.getElementById('screensaver');
         let scrollBox = document.getElementById('screensaver-scroll');
         
-        const snapshot = await get(ref(db, 'scores'));
-        let data = [];
-        if (snapshot.exists()) {
-            Object.values(snapshot.val()).forEach(p => data.push(p));
-        }
-        data.sort((a, b) => b["Score Points"] - a["Score Points"]);
-        
-        if (data.length > 0) {
-            let html = "";
-            data.slice(0, 10).forEach((j, i) => { html += `<div style="margin-bottom:20px;">#${i+1} <strong>${j.Candidat}</strong> - ${j["Score Points"]} pts (${j.Profil})</div>`; });
-            scrollBox.innerHTML = html;
-        } else { scrollBox.innerHTML = "<div>Soyez le premier à jouer sur le réseau !</div>"; }
-        ss.classList.remove('hidden');
+        try {
+            const snapshot = await get(ref(db, 'scores'));
+            let data = [];
+            if (snapshot.exists()) {
+                Object.values(snapshot.val()).forEach(p => data.push(p));
+            }
+            data.sort((a, b) => b["Score Points"] - a["Score Points"]);
+            
+            if (data.length > 0) {
+                let html = "";
+                data.slice(0, 10).forEach((j, i) => { html += `<div style="margin-bottom:20px;">#${i+1} <strong>${j.Candidat}</strong> - ${j["Score Points"]} pts (${j.Profil})</div>`; });
+                scrollBox.innerHTML = html;
+            } else { scrollBox.innerHTML = "<div>Soyez le premier à jouer sur le réseau !</div>"; }
+            ss.classList.remove('hidden');
+        } catch(e) { console.error(e); }
     } else { resetIdleTimer(); }
 }
 

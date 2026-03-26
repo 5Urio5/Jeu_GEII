@@ -6,7 +6,7 @@
     <title>En GEII tout est permis !</title>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=2">
 </head>
 <body>
 
@@ -14,7 +14,7 @@
         <button id="btn-manual-screensaver" onclick="showScreensaver()" title="Activer l'écran de veille">🌙</button>
 
         <div class="logo-container">
-            <img src="logo.png" alt="Logo GEII" onerror="this.style.display='none'; this.parentElement.innerHTML='<h2 style=\'color:black;margin:0\'>GEII - Univ Lille</h2>';">
+            <img src="logo.png?v=2" alt="Logo GEII" onerror="this.style.display='none'; this.parentElement.innerHTML='<h2 style=\'color:black;margin:0\'>GEII - Univ Lille</h2>';">
         </div>
         <h1>🎮 EN GEII TOUT EST PERMIS 🎮</h1>
         <h2>L'Épreuve Ultime : 30 Questions pour trouver ta voie !</h2>
@@ -89,13 +89,13 @@
     </div>
 
     <div id="screensaver" class="hidden" onclick="hideScreensaver()">
-        <div class="logo-container" style="margin-bottom: 50px;"><img src="logo.png" alt="Logo GEII"></div>
+        <div class="logo-container" style="margin-bottom: 50px;"><img src="logo.png?v=2" alt="Logo GEII"></div>
         <h1>LE MUR DES CHAMPIONS</h1>
         <div class="scroll-container"><div class="scroll-content" id="screensaver-scroll"></div></div>
         <div class="touch-to-start">👆 Touchez l'écran pour jouer !</div>
     </div>
 
     <script src="questions.js"></script>
-    <script type="module" src="script.js"></script>
+    <script type="module" src="script.js?v=2"></script>
 </body>
 </html>

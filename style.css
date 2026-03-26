@@ -24,7 +24,7 @@ body {
     -webkit-tap-highlight-color: transparent;
 }
 
-/* L'encadré principal (Vert Développement Durable) */
+/* L'encadré principal */
 .container {
     width: 95%; 
     max-width: 900px;
@@ -53,10 +53,23 @@ body {
     transition: opacity 0.2s, transform 0.2s;
     z-index: 100;
 }
-#btn-manual-screensaver:hover, .btn-cancel-quiz:hover {
-    opacity: 1;
-    transform: scale(1.1);
+#btn-manual-screensaver:hover, .btn-cancel-quiz:hover { opacity: 1; transform: scale(1.1); }
+
+/* ==========================================
+   ANIMATION ROUE DE CHARGEMENT (SPINNER)
+   ========================================== */
+.spinner {
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    border: 4px solid rgba(255,255,255,0.3);
+    border-radius: 50%;
+    border-top-color: #f1c40f;
+    animation: spin 1s ease-in-out infinite;
+    vertical-align: middle;
+    margin-left: 15px;
 }
+@keyframes spin { to { transform: rotate(360deg); } }
 
 /* ==========================================
    ANIMATIONS DE GLISSEMENT (Slides)
@@ -89,33 +102,19 @@ button.main-btn {
     box-shadow: 0 5px 15px rgba(0,0,0,0.4); transition: transform 0.1s, background-color 0.2s; 
 }
 button.main-btn:active { transform: scale(0.95); background-color: #1c2541; }
-
 button.secondary-btn { background-color: #3498db; color: white; font-size: 1.2em; font-weight: bold; padding: 15px 30px; border: none; border-radius: 15px; cursor: pointer; margin: 10px 5px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
 
 /* ==========================================
-   ÉCRAN DE JEU (Questions & Réponses)
+   ÉCRAN DE JEU
    ========================================== */
-/* Mise en page en Grille pour centrer parfaitement le chrono */
-#header-info { 
-    display: grid; 
-    grid-template-columns: 1fr auto 1fr; 
-    align-items: center; 
-    font-size: 1.3em; 
-    font-weight: bold; 
-    margin-bottom: 15px; 
-    width: 100%;
-}
+#header-info { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; font-size: 1.3em; font-weight: bold; margin-bottom: 15px; width: 100%; }
 #player-display { text-align: left; }
 #timer-text { text-align: center; }
 
 #timer-container { width: 100%; height: 15px; background-color: rgba(255,255,255,0.2); border-radius: 10px; overflow: hidden; margin-bottom: 25px; box-shadow: inset 0 2px 5px rgba(0,0,0,0.3); }
 #timer-bar { height: 100%; width: 100%; background-color: #f1c40f; transition: width 1s linear, background-color 0.5s; }
 
-#question-text { 
-    font-size: 1.6em; font-weight: bold; color: white; text-shadow: 1px 1px 2px rgba(0,0,0,0.3); margin: 0; 
-    background-color: rgba(0,0,0,0.4); padding: 25px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); 
-    margin-bottom: 20px;
-}
+#question-text { font-size: 1.6em; font-weight: bold; color: white; text-shadow: 1px 1px 2px rgba(0,0,0,0.3); margin: 0; background-color: rgba(0,0,0,0.4); padding: 25px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); margin-bottom: 20px; }
 
 .answer-btn { background-color: white; color: #2c3e50; font-size: 1.2em; font-weight: bold; padding: 15px 20px; margin: 8px 0; width: 100%; border-radius: 12px; border: 3px solid transparent; text-align: left; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: transform 0.1s;}
 .answer-btn:active:not(:disabled) { transform: scale(0.98); }
@@ -130,14 +129,14 @@ button.secondary-btn { background-color: #3498db; color: white; font-size: 1.2em
 .prog-wrong { background-color: #e74c3c; box-shadow: 0 0 5px #e74c3c; }
 
 /* ==========================================
-   ÉCRAN INTERMÉDIAIRE (Le saviez-vous)
+   ÉCRAN INTERMÉDIAIRE
    ========================================== */
 #intermediate-points { font-size: 4em; font-weight: bold; margin: 20px 0; text-shadow: 0 0 20px rgba(255,255,255,0.5); }
 #intermediate-streak { font-size: 1.5em; color: #f1c40f; margin-bottom: 20px; font-weight: bold; }
 .trivia-box { background: rgba(0,0,0,0.6); padding: 25px; border-radius: 15px; font-size: 1.3em; font-style: italic; margin-bottom: 30px; border-left: 5px solid #3498db; }
 
 /* ==========================================
-   PODIUM & FENÊTRE MODALE DE DÉTAILS
+   PODIUM & MODALE
    ========================================== */
 .admin-tools { margin-top: 40px; display: flex; justify-content: center; gap: 20px; }
 .btn-discret { background: transparent; border: none; color: rgba(255,255,255,0.4); cursor: pointer; font-size: 0.9em; }
@@ -151,7 +150,6 @@ button.secondary-btn { background-color: #3498db; color: white; font-size: 1.2em
 .btn-details { background-color: #3498db; color: white; border: none; padding: 8px 15px; border-radius: 8px; cursor: pointer; font-size: 0.9em; font-weight: bold; }
 .btn-details:hover { background-color: #2980b9; }
 
-/* Modale */
 #details-modal { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); z-index: 10000; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
 #details-modal.show { opacity: 1; pointer-events: auto; }
 .modal-content { background: #1c2541; width: 95%; max-width: 800px; max-height: 85vh; border-radius: 15px; padding: 25px; overflow-y: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.8); position: relative; text-align: left; }
@@ -162,7 +160,6 @@ button.secondary-btn { background-color: #3498db; color: white; font-size: 1.2em
 .correct-cell { color: #2ecc71; font-weight: bold; }
 .wrong-cell { color: #e74c3c; font-weight: bold; }
 
-/* Case à cocher "Conserver" */
 .keep-label { float: right; font-size: 0.8em; color: #ecf0f1; cursor: pointer; background: rgba(255,255,255,0.1); padding: 5px 10px; border-radius: 8px; display: flex; align-items: center; gap: 8px; margin-right: 40px; }
 .keep-label input { transform: scale(1.3); }
 
