@@ -3,9 +3,7 @@
 // ==========================================
 // 🔒 SÉCURITÉ : MOT DE PASSE ADMINISTRATEUR
 // ==========================================
-// Change ce mot de passe ici. Il protège les boutons de Réinitialisation et d'Export Excel.
 const ADMIN_PASSWORD = "iutgeii";
-
 
 // ==========================================
 // FIREBASE - CONNEXION BASE DE DONNÉES TEMPS RÉEL
@@ -42,6 +40,7 @@ window.downloadExcel = downloadExcel;
 window.showScreensaver = showScreensaver;
 window.hideScreensaver = hideScreensaver;
 window.goToNextQuestion = goToNextQuestion;
+window.togglePasswordVisibility = togglePasswordVisibility;
 
 // ==========================================
 // 🛡️ SÉCURITÉ : NETTOYEUR XSS (Anti-Injections)
@@ -51,6 +50,53 @@ function sanitizeString(str) {
         const charsToReplace = { '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' };
         return charsToReplace[tag] || tag;
     });
+}
+
+// ==========================================
+// 🛡️ SÉCURITÉ : SYSTÈME DE MOT DE PASSE MASQUÉ
+// ==========================================
+function askPassword() {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('password-modal');
+        const input = document.getElementById('admin-pwd-input');
+        const submitBtn = document.getElementById('submit-pwd-btn');
+        const cancelBtn = document.getElementById('cancel-pwd-btn');
+        const toggleBtn = document.getElementById('toggle-pwd-btn');
+
+        // Réinitialisation de l'affichage
+        input.value = '';
+        input.type = 'password';
+        toggleBtn.innerText = '👁️';
+
+        modal.classList.add('show');
+        input.focus();
+
+        const cleanup = () => {
+            modal.classList.remove('show');
+            submitBtn.onclick = null;
+            cancelBtn.onclick = null;
+            input.onkeydown = null;
+        };
+
+        submitBtn.onclick = () => { cleanup(); resolve(input.value); };
+        cancelBtn.onclick = () => { cleanup(); resolve(null); };
+        input.onkeydown = (e) => { 
+            if (e.key === 'Enter') { cleanup(); resolve(input.value); } 
+            if (e.key === 'Escape') { cleanup(); resolve(null); }
+        };
+    });
+}
+
+function togglePasswordVisibility() {
+    const input = document.getElementById('admin-pwd-input');
+    const toggleBtn = document.getElementById('toggle-pwd-btn');
+    if (input.type === 'password') {
+        input.type = 'text';
+        toggleBtn.innerText = '🙈';
+    } else {
+        input.type = 'password';
+        toggleBtn.innerText = '👁️';
+    }
 }
 
 // ==========================================
@@ -163,17 +209,13 @@ async function startQuiz() {
     let rawName = document.getElementById('player-name').value.trim();
     if (!rawName) return alert("Hé ! N'oublie pas de taper ton prénom !");
     
-    // Nettoyage de sécurité (Anti-XSS)
     let safeName = sanitizeString(rawName);
-
     document.getElementById('player-name').blur(); 
     
     if (!audioCtx) audioCtx = new AudioContextClass();
     if (audioCtx.state === 'suspended') audioCtx.resume();
 
-    // ========================================================
     // 🔥 CHEAT CODE / EASTER EGG POUR "MANON"
-    // ========================================================
     if (safeName.toLowerCase() === "manon") {
         playerName = "Manon";
         scoresCount = {AII: 5, EME: 7, ESE: 6}; 
@@ -191,9 +233,8 @@ async function startQuiz() {
         triggerSuspense();
         return; 
     }
-    // ========================================================
 
-    // 🛡️ VÉRIFICATION ANTI-DOUBLONS DANS LA BASE DE DONNÉES
+    // 🛡️ VÉRIFICATION ANTI-DOUBLONS
     try {
         const snapshot = await get(ref(db, 'scores'));
         if (snapshot.exists()) {
@@ -363,7 +404,6 @@ async function showResults() {
     document.getElementById('scores-display').innerHTML = htmlScores;
     document.getElementById('best-path').innerText = `👉 PARCOURS CONSEILLÉ : ${bestCat} 👈`;
 
-    // 🏆 CALCUL DU CLASSEMENT EN DIRECT POUR L'E-MAIL
     let rank = 1;
     try {
         const snapshot = await get(ref(db, 'scores'));
@@ -472,152 +512,4 @@ async function openModal(playerId) {
         let tbody = document.getElementById('modal-table-body'); tbody.innerHTML = '';
         
         player.SessionDetails.forEach(q => {
-            let resIcon = q.isCorrect ? `<span class="correct-cell">✅</span>` : `<span class="wrong-cell">❌</span>`;
-            let ptsClass = q.isCorrect ? "correct-cell" : "";
-            
-            let successPct = globalStats[q.q] ? Math.round((globalStats[q.q].correct / globalStats[q.q].asked) * 100) : 100;
-            if(player.Candidat === "Manon") successPct = 100; 
-            let successColor = successPct > 70 ? "#2ecc71" : (successPct < 40 ? "#e74c3c" : "#f1c40f");
-            
-            tbody.innerHTML += `<tr>
-                <td><strong>${q.cat}</strong></td>
-                <td style="text-align:left;">${q.q}</td>
-                <td style="text-align:center;">${resIcon}</td>
-                <td style="text-align:center;">${q.time}s</td>
-                <td style="text-align:center;" class="${ptsClass}">${q.points}</td>
-                <td style="text-align:center; color:${successColor}; font-weight:bold;">${successPct}%</td>
-            </tr>`;
-        });
-        
-        document.getElementById('details-modal').classList.add('show');
-    } catch(e) { console.error(e); }
-}
-
-function closeModal() { document.getElementById('details-modal').classList.remove('show'); }
-
-async function toggleKeep(playerId, isKept) {
-    await set(ref(db, 'scores/' + playerId + '/keep'), isKept);
-}
-
-// 🔒 FONCTION SÉCURISÉE PAR MOT DE PASSE VARIABLE
-async function resetPodium() {
-    let pwd = prompt("⚠️ ZONE ADMINISTRATEUR ⚠️\nVeuillez entrer le mot de passe pour réinitialiser la base de données :");
-    if (pwd !== ADMIN_PASSWORD) {
-        if (pwd !== null) alert("❌ Mot de passe incorrect ! Action annulée.");
-        return;
-    }
-
-    if(confirm("⚠️ Attention, cela effacera tous les scores du réseau mondial (SAUF ceux cochés '📌 Conserver'). Continuer ?")) {
-        const snapshot = await get(ref(db, 'scores'));
-        if (snapshot.exists()) {
-            const scoresObj = snapshot.val();
-            let keptScores = {};
-            for (let key in scoresObj) {
-                if (scoresObj[key].keep) {
-                    keptScores[key] = scoresObj[key];
-                }
-            }
-            await set(ref(db, 'scores'), keptScores);
-        }
-        showPodium();
-    }
-}
-
-// 🔒 FONCTION SÉCURISÉE PAR MOT DE PASSE VARIABLE
-async function downloadExcel() {
-    let pwd = prompt("⚠️ ZONE ADMINISTRATEUR ⚠️\nVeuillez entrer le mot de passe pour télécharger le rapport Excel :");
-    if (pwd !== ADMIN_PASSWORD) {
-        if (pwd !== null) alert("❌ Mot de passe incorrect ! Action annulée.");
-        return;
-    }
-
-    const snapshot = await get(ref(db, 'scores'));
-    if (!snapshot.exists()) return alert("Aucun score enregistré sur le réseau pour le moment !");
-    
-    let scoresObj = snapshot.val();
-    let dataJoueurs = Object.values(scoresObj);
-    dataJoueurs.sort((a, b) => b["Score Points"] - a["Score Points"]);
-    
-    let globalStats = {};
-    dataJoueurs.forEach(p => {
-        if(p.SessionDetails) {
-            p.SessionDetails.forEach(q => {
-                if(!globalStats[q.q]) globalStats[q.q] = { cat: q.cat, asked: 0, correct: 0 };
-                globalStats[q.q].asked++;
-                if(q.isCorrect) globalStats[q.q].correct++;
-            });
-        }
-    });
-
-    let wb = window.XLSX.utils.book_new();
-    // 📧 AJOUT DE LA COLONNE E-MAIL DANS L'EXCEL EXPORTÉ
-    let exportJoueurs = dataJoueurs.map(j => ({
-        "Candidat": j.Candidat, 
-        "Adresse E-mail": j.Email || "Non fournie",
-        "Score Global": j["Score Points"], 
-        "Profil": j.Profil,
-        "AII (Bonnes Rép.)": j.ScoresCount.AII + "/10", "AII (Points)": j.ScoresPoints.AII,
-        "EME (Bonnes Rép.)": j.ScoresCount.EME + "/10", "EME (Points)": j.ScoresPoints.EME,
-        "ESE (Bonnes Rép.)": j.ScoresCount.ESE + "/10", "ESE (Points)": j.ScoresPoints.ESE
-    }));
-    let ws1 = window.XLSX.utils.json_to_sheet(exportJoueurs); window.XLSX.utils.book_append_sheet(wb, ws1, "Classement Joueurs");
-    
-    let exportStats = Object.keys(globalStats).map(qText => {
-        let st = globalStats[qText];
-        return { "Catégorie": st.cat, "Question": qText, "Fois posée": st.asked, "Fois réussie": st.correct, "Taux de réussite (%)": Math.round((st.correct / st.asked) * 100) };
-    });
-    exportStats.sort((a, b) => b["Taux de réussite (%)"] - a["Taux de réussite (%)"]);
-    
-    let ws2 = window.XLSX.utils.json_to_sheet(exportStats); window.XLSX.utils.book_append_sheet(wb, ws2, "Statistiques Questions");
-    window.XLSX.writeFile(wb, "Rapport_Analytique_GEII_Cloud.xlsx");
-}
-
-// ==========================================
-// GESTION CLAVIER (Touche Entrée)
-// ==========================================
-document.addEventListener('keydown', function(event) {
-    if (event.key === 'Enter') {
-        const activeScreen = document.querySelector('.active-screen');
-        if (activeScreen && activeScreen.id === 'screen-start') {
-            startQuiz();
-        } else if (activeScreen && activeScreen.id === 'screen-intermediate') {
-            goToNextQuestion();
-        }
-    }
-});
-
-// ==========================================
-// ÉCRAN DE VEILLE (Screensaver Réseau)
-// ==========================================
-function resetIdleTimer() { clearTimeout(idleTimer); hideScreensaver(); idleTimer = setTimeout(showScreensaver, IDLE_TIME); }
-
-async function showScreensaver() {
-    const active = document.querySelector('.active-screen');
-    if(active && (active.id === 'screen-start' || active.id === 'screen-podium')) {
-        let ss = document.getElementById('screensaver');
-        let scrollBox = document.getElementById('screensaver-scroll');
-        
-        try {
-            const snapshot = await get(ref(db, 'scores'));
-            let data = [];
-            if (snapshot.exists()) {
-                Object.values(snapshot.val()).forEach(p => data.push(p));
-            }
-            data.sort((a, b) => b["Score Points"] - a["Score Points"]);
-            
-            if (data.length > 0) {
-                let html = "";
-                data.slice(0, 10).forEach((j, i) => { html += `<div style="margin-bottom:20px;">#${i+1} <strong>${j.Candidat}</strong> - ${j["Score Points"]} pts (${j.Profil})</div>`; });
-                scrollBox.innerHTML = html;
-            } else { scrollBox.innerHTML = "<div>Soyez le premier à jouer sur le réseau !</div>"; }
-            ss.classList.remove('hidden');
-        } catch(e) { console.error(e); }
-    } else { resetIdleTimer(); }
-}
-
-function hideScreensaver() { document.getElementById('screensaver').classList.add('hidden'); }
-
-document.addEventListener('mousemove', resetIdleTimer); 
-document.addEventListener('touchstart', resetIdleTimer); 
-document.addEventListener('keydown', resetIdleTimer);
-resetIdleTimer();
+            let resIcon = q.isCorrect ? `<span class="correct-cell">✅</span>

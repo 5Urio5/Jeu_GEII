@@ -4,13 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>En GEII tout est permis !</title>
-    
-    <link rel="icon" type="image/png" href="logo_onglet_noir.png?v=8">
-    <link rel="icon" type="image/png" href="logo_onglet_blanc.png?v=8" media="(prefers-color-scheme: dark)">
+    <link rel="icon" type="image/png" href="logo_onglet_noir.png?v=9">
+    <link rel="icon" type="image/png" href="logo_onglet_blanc.png?v=9" media="(prefers-color-scheme: dark)">
     
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
-    <link rel="stylesheet" href="style.css?v=8">
+    <link rel="stylesheet" href="style.css?v=9">
 </head>
 <body>
 
@@ -19,8 +18,8 @@
 
         <div class="logo-container">
             <picture>
-                <source srcset="logo_blanc.png?v=8" media="(prefers-color-scheme: dark)">
-                <img src="logo_noir.png?v=8" alt="Logo GEII" onerror="this.style.display='none'; this.parentElement.innerHTML='<h2 style=\'color:#f1c40f;margin:0\'>GEII - Univ Lille</h2>';">
+                <source srcset="logo_blanc.png?v=9" media="(prefers-color-scheme: dark)">
+                <img src="logo_noir.png?v=9" alt="Logo GEII" onerror="this.style.display='none'; this.parentElement.innerHTML='<h2 style=\'color:#f1c40f;margin:0\'>GEII - Univ Lille</h2>';">
             </picture>
         </div>
 
@@ -96,11 +95,26 @@
         </div>
     </div>
 
+    <div id="password-modal">
+        <div class="modal-content pwd-modal-box">
+            <h2 style="color:#f1c40f; margin-top: 0;">⚠️ ZONE ADMINISTRATEUR ⚠️</h2>
+            <p style="font-size: 1.2em; margin-bottom: 20px;">Veuillez entrer le mot de passe :</p>
+            <div class="pwd-container">
+                <input type="password" id="admin-pwd-input" placeholder="Mot de passe" autocomplete="off">
+                <span id="toggle-pwd-btn" class="pwd-toggle" onclick="togglePasswordVisibility()" title="Afficher/Masquer">👁️</span>
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: center; margin-top: 20px;">
+                <button class="secondary-btn" id="cancel-pwd-btn" style="background-color: #e74c3c; margin: 0; width: 45%;">Annuler</button>
+                <button class="main-btn" id="submit-pwd-btn" style="margin: 0; width: 45%; padding: 15px;">Valider</button>
+            </div>
+        </div>
+    </div>
+
     <div id="screensaver" class="hidden" onclick="hideScreensaver()">
         <div class="logo-container" style="margin-bottom: 50px;">
             <picture>
-                <source srcset="logo_blanc.png?v=8" media="(prefers-color-scheme: dark)">
-                <img src="logo_noir.png?v=8" alt="Logo GEII">
+                <source srcset="logo_blanc.png?v=9" media="(prefers-color-scheme: dark)">
+                <img src="logo_noir.png?v=9" alt="Logo GEII">
             </picture>
         </div>
         <h1>LE MUR DES CHAMPIONS</h1>
@@ -109,6 +123,6 @@
     </div>
 
     <script src="questions.js"></script>
-    <script type="module" src="script.js?v=8"></script>
+    <script type="module" src="script.js?v=9"></script>
 </body>
 </html>
