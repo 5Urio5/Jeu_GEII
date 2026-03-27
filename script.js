@@ -482,7 +482,7 @@ function goToNextQuestion() {
 // RÉSULTATS ET GRAPHIQUES RADAR
 // ==========================================
 
-// Le "Plugin" de Chart.js qui peint le fond en bleu nuit lors de la création du PDF !
+// Plugin de Chart.js : Peint le fond en bleu nuit lors de la création du PDF !
 const customCanvasBackgroundColor = {
     id: 'customCanvasBackgroundColor',
     beforeDraw: (chart, args, options) => {
@@ -843,7 +843,7 @@ async function downloadExcel() {
 }
 
 // ==========================================
-// EXPORT PDF (Propre, Aéré, avec Logo dynamique & QR Code aligné)
+// EXPORT PDF (Zéro Emoji = Zéro Bug, Net et Précis)
 // ==========================================
 function buildPDF(playerData, chartDataUrl) {
     const { jsPDF } = window.jspdf;
@@ -909,9 +909,10 @@ function buildPDF(playerData, chartDataUrl) {
         });
 
         // --- 5. CONCLUSION, LIEN CLIQUE ICI ET QR CODE ---
-        let finalY = doc.lastAutoTable.finalY + 20;
+        let finalY = doc.lastAutoTable.finalY + 15;
 
-        if (finalY > 220) { 
+        // Saut de page de sécurité si on est trop bas
+        if (finalY > 230) { 
             doc.addPage(); 
             finalY = 20; 
         }
@@ -926,49 +927,60 @@ function buildPDF(playerData, chartDataUrl) {
         doc.setTextColor(41, 128, 185);
         doc.text("Et maintenant ?", 15, finalY);
 
+        // Texte d'avertissement
         doc.setFont("helvetica", "italic"); 
         doc.setFontSize(10); 
         doc.setTextColor(100, 100, 100);
         let conclusionText = "Ce bilan est issu d'un jeu récréatif scientifique. Il ne définit en rien ton avenir scolaire ou professionnel, mais souligne tes affinités actuelles. L'important est de choisir la voie qui te passionne !";
         doc.text(conclusionText, 15, finalY + 6, { maxWidth: 130, align: 'justify', lineHeightFactor: 1.5 });
 
+        // Titre de l'invitation à rejouer
         doc.setFont("helvetica", "bold"); 
         doc.setFontSize(12); 
-        doc.setTextColor(39, 174, 96);
+        doc.setTextColor(39, 174, 96); // Vert
         doc.text("Envie de rejouer ou de défier tes amis ?", 15, finalY + 25);
         
-        // La fameuse ligne "👉 Clique ici" avec texte propre ensuite
+        // --- LA PHRASE CLIQUE ICI (Sans Emojis) ---
         doc.setFont("helvetica", "normal"); 
         doc.setFontSize(11); 
         doc.setTextColor(50, 50, 50);
-        doc.text("👉 ", 15, finalY + 33);
+        
+        let puce = "- ";
+        doc.text(puce, 15, finalY + 33);
+        let puceWidth = doc.getTextWidth(puce);
         
         // Lien cliquable et souligné
         let clickText = "Clique ici";
         doc.setTextColor(41, 128, 185); // Bleu lien
-        doc.text(clickText, 22, finalY + 33);
+        doc.text(clickText, 15 + puceWidth, finalY + 33);
+        let clickWidth = doc.getTextWidth(clickText);
         
-        let textWidth = doc.getTextWidth(clickText);
+        // Le soulignement précis
         doc.setDrawColor(41, 128, 185); 
         doc.setLineWidth(0.3);
-        doc.line(22, finalY + 34, 22 + textWidth, finalY + 34); // Le soulignement exact sous "Clique ici"
-        doc.link(22, finalY + 28, textWidth, 8, { url: 'https://5urio5.github.io/Jeu_GEII/' }); // Zone de clic
+        doc.line(15 + puceWidth, finalY + 34, 15 + puceWidth + clickWidth, finalY + 34); 
         
-        // Suite : QR Code
+        // Zone cliquable
+        doc.link(15 + puceWidth, finalY + 28, clickWidth, 6, { url: 'https://5urio5.github.io/Jeu_GEII/' }); 
+        
+        // Suite de la phrase (sans colision avec le QR code)
         doc.setTextColor(50, 50, 50);
-        let suiteText = " pour y accéder, ou scanne le code QR juste ici 👉";
-        doc.text(suiteText, 22 + textWidth + 1, finalY + 33);
+        let suiteText = " pour y accéder, ou scanne le code QR juste ici :";
+        doc.text(suiteText, 15 + puceWidth + clickWidth, finalY + 33);
 
+        // --- AFFICHAGE DU QR CODE ---
         if(qrUrl) {
-            doc.addImage(qrUrl, 'PNG', 150, finalY + 5, 35, 35); // Correctement placé à droite
-            doc.setFontSize(8); 
+            // Positionné sagement à droite (X=145)
+            doc.addImage(qrUrl, 'PNG', 145, finalY + 15, 35, 35); 
+            doc.setFontSize(9); 
             doc.setTextColor(120, 120, 120); 
-            doc.text("Scannez pour jouer !", 167.5, finalY + 43, { align: "center" });
+            doc.text("Scanne-moi !", 162.5, finalY + 54, { align: "center" });
         }
 
         doc.save(`Bilan_GEII_${playerData.Candidat}.pdf`);
     };
 
+    // Chargement parallèle (Logo + QR Code)
     let logoLoaded = false; 
     let logoDataUrl = null;
     let qrLoaded = false; 
@@ -987,10 +999,12 @@ function buildPDF(playerData, chartDataUrl) {
         canvas.height = imgLogo.naturalHeight;
         canvas.getContext('2d').drawImage(imgLogo, 0, 0); 
         logoDataUrl = canvas.toDataURL('image/png');
-        logoLoaded = true; checkAllLoaded();
+        logoLoaded = true; 
+        checkAllLoaded();
     };
     imgLogo.onerror = () => { 
-        logoLoaded = true; checkAllLoaded(); 
+        logoLoaded = true; 
+        checkAllLoaded(); 
     };
 
     const imgQR = new Image(); 
@@ -1001,10 +1015,12 @@ function buildPDF(playerData, chartDataUrl) {
         canvas.height = imgQR.naturalHeight;
         canvas.getContext('2d').drawImage(imgQR, 0, 0); 
         qrDataUrl = canvas.toDataURL('image/png');
-        qrLoaded = true; checkAllLoaded();
+        qrLoaded = true; 
+        checkAllLoaded();
     };
     imgQR.onerror = () => { 
-        qrLoaded = true; checkAllLoaded(); 
+        qrLoaded = true; 
+        checkAllLoaded(); 
     };
 }
 
