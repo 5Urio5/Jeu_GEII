@@ -489,6 +489,7 @@ async function openModal(playerId) {
         let allPlayers = Object.values(scoresObj);
         let player = { id: playerId, ...scoresObj[playerId] };
         
+        // Calcul des statistiques globales pour chaque question
         let globalStats = {};
         allPlayers.forEach(p => {
             if(p.SessionDetails) {
@@ -512,12 +513,28 @@ async function openModal(playerId) {
         let tbody = document.getElementById('modal-table-body'); 
         tbody.innerHTML = '';
 
-        player.SessionDetails.forEach(q => {
-            let resIcon = q.isCorrect ? `<span class="correct-cell">✅</span>` : `<span class="incorrect-cell">❌</span>`;
-            tbody.innerHTML += `<tr><td>${resIcon}</td></tr>`;
-        });
+        if (player.SessionDetails) {
+            player.SessionDetails.forEach(q => {
+                let resIcon = q.isCorrect ? `<span class="correct-cell">✅</span>` : `<span class="incorrect-cell">❌</span>`;
+                
+                let successRate = "-";
+                if (globalStats[q.q] && globalStats[q.q].asked > 0) {
+                    successRate = Math.round((globalStats[q.q].correct / globalStats[q.q].asked) * 100) + "%";
+                }
+
+                tbody.innerHTML += `<tr>
+                    <td style="text-align:center;">${q.cat}</td>
+                    <td>${q.q}</td>
+                    <td style="text-align:center;">${resIcon}</td>
+                    <td style="text-align:center;">${q.time}s</td>
+                    <td style="text-align:center;">${q.points}</td>
+                    <td style="text-align:center;">${successRate}</td>
+                </tr>`;
+            });
+        } else {
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;">Aucun détail disponible pour cette session.</td></tr>`;
+        }
         
-        // C'est cette ligne qui affiche la modale !
         document.getElementById('details-modal').classList.add('show');
         
     } catch (error) {
@@ -526,7 +543,7 @@ async function openModal(playerId) {
 }
 
 // ==========================================
-// FONCTIONS MANQUANTES : MODALE, EXPORT EXCEL ET ÉCRAN DE VEILLE
+// OUTILS ADMINISTRATEUR (Export, Modale, etc.)
 // ==========================================
 
 function closeModal() {
@@ -566,12 +583,19 @@ async function downloadExcel() {
             const snapshot = await get(ref(db, 'scores'));
             if (!snapshot.exists()) return alert("Aucune donnée à exporter.");
             
-            let data = [];
-            const scoresObj = snapshot.val();
+            let dataPlayers = [];
+            let dataQuestions = [];
+            let dataDetails = [];
             
+            const scoresObj = snapshot.val();
+            let allPlayers = Object.values(scoresObj);
+            
+            // --- 1. COMPILATION DES STATS JOUEURS & DÉTAILS SESSIONS ---
             for (let key in scoresObj) {
                 let p = scoresObj[key];
-                data.push({
+                
+                // Remplissage de l'onglet Joueurs
+                dataPlayers.push({
                     "Candidat": p.Candidat || "Inconnu",
                     "Score Global": p["Score Points"] || 0,
                     "Profil": p.Profil || "",
@@ -584,15 +608,73 @@ async function downloadExcel() {
                     "Email Contact": p.Email || "",
                     "Conserver (Épinglé)": p.keep ? "OUI" : "NON"
                 });
+                
+                // Remplissage de l'onglet Détail Sessions (Historique complet)
+                if (p.SessionDetails) {
+                    p.SessionDetails.forEach((q, index) => {
+                        dataDetails.push({
+                            "Candidat": p.Candidat,
+                            "Numéro Question": index + 1,
+                            "Catégorie": q.cat,
+                            "Question": q.q,
+                            "Résultat": q.isCorrect ? "VRAI" : "FAUX",
+                            "Temps de réponse (s)": q.time,
+                            "Points Gagnés": q.points
+                        });
+                    });
+                }
             }
             
-            // Trie les données par score décroissant
-            data.sort((a, b) => b["Score Global"] - a["Score Global"]);
+            // Trie les joueurs par score décroissant
+            dataPlayers.sort((a, b) => b["Score Global"] - a["Score Global"]);
             
-            // Création du fichier Excel via la librairie XLSX
-            const ws = window.XLSX.utils.json_to_sheet(data);
+            // --- 2. STATISTIQUES GLOBALES DES QUESTIONS ---
+            let globalStats = {};
+            allPlayers.forEach(p => {
+                if (p.SessionDetails) {
+                    p.SessionDetails.forEach(q => {
+                        if (!globalStats[q.q]) {
+                            globalStats[q.q] = { cat: q.cat, asked: 0, correct: 0 };
+                        }
+                        globalStats[q.q].asked++;
+                        if (q.isCorrect) globalStats[q.q].correct++;
+                    });
+                }
+            });
+
+            for (let qText in globalStats) {
+                let stat = globalStats[qText];
+                let successRate = stat.asked > 0 ? Math.round((stat.correct / stat.asked) * 100) + "%" : "0%";
+                dataQuestions.push({
+                    "Catégorie": stat.cat,
+                    "Question": qText,
+                    "Fois Posée": stat.asked,
+                    "Bonnes Réponses": stat.correct,
+                    "Taux de Réussite": successRate
+                });
+            }
+            
+            // Trie les questions par Catégorie pour un affichage plus propre
+            dataQuestions.sort((a, b) => a.Catégorie.localeCompare(b.Catégorie));
+            
+            // --- 3. CRÉATION DU FICHIER EXCEL MULTI-ONGLETS ---
             const wb = window.XLSX.utils.book_new();
-            window.XLSX.utils.book_append_sheet(wb, ws, "Scores_GEII");
+            
+            // Onglet 1 : Les joueurs
+            const wsPlayers = window.XLSX.utils.json_to_sheet(dataPlayers);
+            window.XLSX.utils.book_append_sheet(wb, wsPlayers, "Classement Joueurs");
+            
+            // Onglet 2 : Les Questions
+            const wsQuestions = window.XLSX.utils.json_to_sheet(dataQuestions);
+            window.XLSX.utils.book_append_sheet(wb, wsQuestions, "Stats Questions");
+            
+            // Onglet 3 : Le détail brut
+            if(dataDetails.length > 0) {
+                const wsDetails = window.XLSX.utils.json_to_sheet(dataDetails);
+                window.XLSX.utils.book_append_sheet(wb, wsDetails, "Détail Sessions");
+            }
+            
+            // Lancement du téléchargement
             window.XLSX.writeFile(wb, "Resultats_Jeu_GEII.xlsx");
             
         } catch (e) {
