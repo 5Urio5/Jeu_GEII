@@ -56,7 +56,7 @@ let resultsChartInstance = null;
 let modalChartInstance = null;
 let currentViewingPlayerId = null; // Pour le bouton d'export Admin
 
-// Poids des difficultés
+// Poids des difficultés (Crucial pour la justesse du Radar Chart)
 const diffWeights = { "Com": 1, "STI": 2, "BU1": 3, "BU2": 4 };
 
 // Au démarrage, on récupère les questions depuis Firebase
@@ -246,8 +246,16 @@ function processAnswer(selectedIndex, correctIndex, clickedBtn) {
         allBtns.forEach(b => { if (parseInt(b.dataset.idx) === correctIndex) b.classList.add('btn-correct'); });
     }
     
-    // On enregistre aussi la difficulté (diff) pour le graphique radar plus tard !
-    playerSessionDetails.push({ cat: qData.cat, diff: qData.diff, q: qData.q, isCorrect: isCorrect, time: timeTaken, points: pointsGained, correctAnsText: qData.opt[qData.ans] });
+    // LA CORRECTION EST LÀ : on sauvegarde "diff" et "correctAnsText" pour le PDF et le Graphique
+    playerSessionDetails.push({ 
+        cat: qData.cat, 
+        diff: qData.diff, 
+        q: qData.q, 
+        isCorrect: isCorrect, 
+        time: timeTaken, 
+        points: pointsGained, 
+        correctAnsText: qData.opt[qData.ans] 
+    });
 
     document.getElementById('live-score').innerText = `${scoreTotal} pts`;
     setTimeout(() => { showIntermediateScreen(isCorrect, pointsGained, qData.trivia, isTimeout); }, 1500);
@@ -276,7 +284,7 @@ function goToNextQuestion() {
 function calculateRadarData(sessionDetails) {
     let stats = { AII: {max:0, val:0}, EME: {max:0, val:0}, ESE: {max:0, val:0} };
     sessionDetails.forEach(q => {
-        let w = diffWeights[q.diff] || 1;
+        let w = diffWeights[q.diff] || 1; // La difficulté est maintenant bien récupérée !
         if(stats[q.cat]) {
             stats[q.cat].max += w;
             if(q.isCorrect) stats[q.cat].val += w;
@@ -305,11 +313,11 @@ function drawRadarChart(canvasId, dataArray, chartInstanceToUpdate) {
             }]
         },
         options: {
+            animation: false, // OBLIGATOIRE : Prévient les erreurs de rendu lors de la création du PDF !
             scales: {
                 r: { angleLines: { color: 'rgba(255, 255, 255, 0.2)' }, grid: { color: 'rgba(255, 255, 255, 0.2)' }, pointLabels: { color: '#fff', font: { size: 14, weight: 'bold' } }, ticks: { display: false, min: 0, max: 100, stepSize: 20 } }
             },
-            plugins: { legend: { display: false } },
-            animation: { duration: 1500, easing: 'easeOutQuart' }
+            plugins: { legend: { display: false } }
         }
     });
 }
@@ -457,55 +465,69 @@ async function downloadExcel() {
 }
 
 // ==========================================
-// EXPORT PDF (Bilan Individuel)
+// EXPORT PDF (Bilan Individuel Corrigé)
 // ==========================================
-// Fonction générique de création du PDF
 function buildPDF(playerData, chartDataUrl) {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
     
-    // Ajout du logo via canvas invisible
-    const imgElement = document.getElementById('main-logo');
-    const canvas = document.createElement('canvas');
-    canvas.width = imgElement.naturalWidth; canvas.height = imgElement.naturalHeight;
-    canvas.getContext('2d').drawImage(imgElement, 0, 0);
-    const logoDataUrl = canvas.toDataURL('image/png');
-    
-    doc.addImage(logoDataUrl, 'PNG', 15, 10, 80, 25);
-    
-    // Titres
-    doc.setFont("helvetica", "bold"); doc.setFontSize(22);
-    doc.text("BILAN DE COMPÉTENCES GEII", 105, 25, {align: "center"});
-    doc.setFontSize(16); doc.setTextColor(0, 102, 204);
-    doc.text(`Candidat : ${playerData.Candidat}`, 15, 45);
-    doc.setTextColor(0, 0, 0); doc.setFontSize(12);
-    doc.text(`Score Final : ${playerData["Score Points"] || scoreTotal} pts`, 15, 55);
-    doc.text(`Profil Recommandé : ${playerData.Profil || document.getElementById('best-path').innerText.replace('👉 PARCOURS CONSEILLÉ : ', '').replace(' 👈', '')}`, 15, 62);
+    // Fonction qui finit de générer le PDF une fois le logo chargé (ou échoué)
+    const finishPDF = (logoUrl) => {
+        if(logoUrl) {
+            doc.addImage(logoUrl, 'PNG', 15, 10, 60, 20); // Logo bien placé en haut à gauche
+        }
+        
+        doc.setFont("helvetica", "bold"); doc.setFontSize(22);
+        doc.text("BILAN DE COMPÉTENCES GEII", 105, 20, {align: "center"});
+        
+        doc.setFontSize(14); doc.setTextColor(0, 102, 204);
+        doc.text(`Candidat : ${playerData.Candidat}`, 15, 45);
+        
+        doc.setTextColor(0, 0, 0); doc.setFontSize(12);
+        doc.text(`Score Final : ${playerData["Score Points"] || scoreTotal} pts`, 15, 55);
+        
+        let profil = playerData.Profil || document.getElementById('best-path').innerText.replace('👉 PARCOURS CONSEILLÉ : ', '').replace(' 👈', '');
+        doc.text(`Profil Recommandé : ${profil}`, 15, 65);
 
-    // Graphique Radar
-    if(chartDataUrl) { doc.addImage(chartDataUrl, 'PNG', 120, 35, 70, 70); }
+        // On glisse le radar chart en haut à droite
+        if(chartDataUrl) { doc.addImage(chartDataUrl, 'PNG', 120, 25, 75, 75); }
 
-    // Tableau des questions
-    let tableData = [];
-    if(playerData.SessionDetails) {
-        playerData.SessionDetails.forEach(q => {
-            tableData.push([ q.cat, q.q, q.isCorrect ? "VRAI" : "FAUX", q.correctAnsText || "N/A" ]);
+        let tableData = [];
+        if(playerData.SessionDetails) {
+            playerData.SessionDetails.forEach(q => {
+                tableData.push([ q.cat, q.q, q.isCorrect ? "VRAI" : "FAUX", q.correctAnsText || "N/A" ]);
+            });
+        }
+
+        // On abaisse le point de départ du tableau à 110 pour aérer l'en-tête
+        doc.autoTable({
+            startY: 110,
+            head: [['Catégorie', 'Question Posée', 'Résultat', 'Bonne Réponse']],
+            body: tableData,
+            headStyles: { fillColor: [46, 204, 113] },
+            styles: { fontSize: 9 },
+            columnStyles: { 0: { cellWidth: 20 }, 1: { cellWidth: 90 }, 2: { cellWidth: 20 }, 3: { cellWidth: 50 } }
         });
-    }
 
-    doc.autoTable({
-        startY: 110,
-        head: [['Catégorie', 'Question Posée', 'Résultat', 'Bonne Réponse']],
-        body: tableData,
-        headStyles: { fillColor: [46, 204, 113] },
-        styles: { fontSize: 9 },
-        columnStyles: { 0: { cellWidth: 20 }, 1: { cellWidth: 90 }, 2: { cellWidth: 20 }, 3: { cellWidth: 50 } }
-    });
+        doc.save(`Bilan_GEII_${playerData.Candidat}.pdf`);
+    };
 
-    doc.save(`Bilan_GEII_${playerData.Candidat}.pdf`);
+    // On force le navigateur à télécharger le logo noir, même si l'écran est en mode sombre !
+    const imgElement = new Image();
+    imgElement.crossOrigin = "anonymous";
+    imgElement.src = "logo_noir.png"; // On ne dépend plus du HTML
+    
+    imgElement.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = imgElement.naturalWidth; canvas.height = imgElement.naturalHeight;
+        canvas.getContext('2d').drawImage(imgElement, 0, 0);
+        finishPDF(canvas.toDataURL('image/png'));
+    };
+    imgElement.onerror = () => { 
+        finishPDF(null); // Si le logo plante, on génère le PDF sans lui
+    }; 
 }
 
-// Généré par le joueur en fin de partie (sans MDP)
 function generatePlayerPDF() {
     if(!resultsChartInstance) return alert("Graphique non disponible.");
     let chartUrl = resultsChartInstance.toBase64Image();
@@ -513,7 +535,6 @@ function generatePlayerPDF() {
     buildPDF(pData, chartUrl);
 }
 
-// Généré par l'admin via la modale (avec MDP)
 async function generateAdminPDF() {
     let pwd = await askPassword();
     if (pwd === ADMIN_PASSWORD) {
@@ -563,7 +584,6 @@ function renderEditorList() {
 }
 
 function addNewQuestion() {
-    // Injecte une question vide à la fin
     dynamicDB.push({ cat: "AII", diff: "Com", q: "Nouvelle Question", opt: ["Rép 1", "Rép 2", "Rép 3", "Rép 4"], ans: 0, trivia: "Le saviez-vous ?" });
     editQuestion(dynamicDB.length - 1);
 }
@@ -578,7 +598,7 @@ async function deleteQuestion(index) {
 
 async function resetQuestionsToDefault() {
     if(confirm("⚠️ Écraser toutes les modifications et remettre la base de données d'origine ?")) {
-        dynamicDB = JSON.parse(JSON.stringify(DB)); // Clone profond
+        dynamicDB = JSON.parse(JSON.stringify(DB)); 
         try { await set(ref(db, 'questions'), dynamicDB); renderEditorList(); alert("Restauration réussie !"); } 
         catch(e) { alert("Erreur sauvegarde Firebase"); }
     }
@@ -657,7 +677,7 @@ function hideScreensaver() { document.getElementById('screensaver').classList.ad
 resetIdleTimer();
 
 // ==========================================
-// SUPER ÉCOUTEUR CLAVIER (Focus Retiré)
+// SUPER ÉCOUTEUR CLAVIER (Avec focus dynamique)
 // ==========================================
 document.addEventListener('keydown', function(e) {
     const activeScreen = document.querySelector('.active-screen');
