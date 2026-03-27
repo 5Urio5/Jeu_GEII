@@ -43,7 +43,7 @@ window.goToNextQuestion = goToNextQuestion;
 window.togglePasswordVisibility = togglePasswordVisibility;
 
 // ==========================================
-// 🛡️ SÉCURITÉ : NETTOYEUR XSS
+// 🛡️ SÉCURITÉ : NETTOYEUR XSS (Anti-Injections)
 // ==========================================
 function sanitizeString(str) {
     return str.replace(/[&<>'"]/g, function(tag) {
@@ -53,7 +53,7 @@ function sanitizeString(str) {
 }
 
 // ==========================================
-// 🛡️ MODALE DU MOT DE PASSE (PROMESSE)
+// 🛡️ SÉCURITÉ : SYSTÈME DE MOT DE PASSE MASQUÉ
 // ==========================================
 function askPassword() {
     return new Promise((resolve) => {
@@ -127,7 +127,7 @@ let idleTimer;
 const IDLE_TIME = 120000; 
 
 // ==========================================
-// GESTION AUDIO (Synthétiseur)
+// GESTION AUDIO
 // ==========================================
 const AudioContextClass = window.AudioContext || window.webkitAudioContext;
 let audioCtx;
@@ -179,7 +179,7 @@ function slideTo(screenId) {
     }
     const nextScreen = document.getElementById(screenId);
     nextScreen.classList.remove('hidden'); nextScreen.classList.add('slide-in-right');
-    void nextScreen.offsetWidth; // Force le reflow
+    void nextScreen.offsetWidth;
     nextScreen.classList.remove('slide-in-right'); nextScreen.classList.add('active-screen');
 }
 
@@ -188,7 +188,7 @@ function goToStart() {
     setRandomBackground(); 
     resetIdleTimer();
     slideTo('screen-start');
-    setTimeout(() => { document.getElementById('player-name').focus(); }, 400); // Focus auto sur l'input
+    setTimeout(() => { document.getElementById('player-name').focus(); }, 400);
 }
 
 function cancelQuiz() {
@@ -212,7 +212,6 @@ async function startQuiz() {
     let safeName = sanitizeString(rawName);
     document.getElementById('player-name').blur(); 
     
-    // Débloque l'audio navigateur
     if (!audioCtx) audioCtx = new AudioContextClass();
     if (audioCtx.state === 'suspended') audioCtx.resume();
 
@@ -235,7 +234,7 @@ async function startQuiz() {
         return; 
     }
 
-    // 🛡️ VÉRIFICATION ANTI-DOUBLONS FIREBASE
+    // 🛡️ VÉRIFICATION ANTI-DOUBLONS
     try {
         const snapshot = await get(ref(db, 'scores'));
         if (snapshot.exists()) {
@@ -248,13 +247,11 @@ async function startQuiz() {
         }
     } catch(e) { console.error("Erreur de connexion pour la vérification du nom", e); }
 
-    // Initialisation
     playerName = safeName;
     scoresPoints = {AII: 0, EME: 0, ESE: 0};
     scoresCount = {AII: 0, EME: 0, ESE: 0};
     scoreTotal = 0; currentStreak = 0; currentQIndex = 0; playerSessionDetails = [];
     
-    // Génération aléatoire des questions
     let selected = [];
     ['AII', 'EME', 'ESE'].forEach(cat => {
         let catQ = DB.filter(q => q.cat === cat);
@@ -273,8 +270,7 @@ async function startQuiz() {
 
     document.getElementById('player-display').innerHTML = `👤 ${playerName} <span style="margin-left:20px; color:#f1c40f;" id="live-score">0 pts</span>`;
     
-    slideTo('screen-game'); 
-    loadQuestion();
+    slideTo('screen-game'); loadQuestion();
 }
 
 function loadQuestion() {
@@ -291,22 +287,14 @@ function loadQuestion() {
     
     let container = document.getElementById('answers-container'); container.innerHTML = ''; 
     let options = qData.opt.map((text, index) => ({text, originalIndex: index}));
-    options.sort(() => 0.5 - Math.random()); // Mélange des réponses
+    options.sort(() => 0.5 - Math.random());
     
-    options.forEach((opt, arrayIndex) => {
+    options.forEach(opt => {
         let btn = document.createElement('button');
-        btn.className = 'answer-btn'; 
-        btn.innerText = opt.text; 
-        btn.dataset.idx = opt.originalIndex; 
+        btn.className = 'answer-btn'; btn.innerText = opt.text; btn.dataset.idx = opt.originalIndex; 
         btn.onclick = (e) => processAnswer(opt.originalIndex, qData.ans, e.target);
         container.appendChild(btn);
     });
-
-    // Auto-focus sur la première réponse pour faciliter la navigation au clavier !
-    setTimeout(() => {
-        let firstBtn = document.querySelector('.answer-btn');
-        if (firstBtn) firstBtn.focus();
-    }, 100);
 
     timerInterval = setInterval(() => {
         timeLeft--; updateTimerText();
@@ -354,10 +342,7 @@ function processAnswer(selectedIndex, correctIndex, clickedBtn) {
     });
 
     document.getElementById('live-score').innerText = `${scoreTotal} pts`;
-    
-    setTimeout(() => { 
-        showIntermediateScreen(isCorrect, pointsGained, qData.trivia, isTimeout); 
-    }, 1500);
+    setTimeout(() => { showIntermediateScreen(isCorrect, pointsGained, qData.trivia, isTimeout); }, 1500);
 }
 
 function showIntermediateScreen(isCorrect, points, trivia, isTimeout) {
@@ -384,22 +369,13 @@ function showIntermediateScreen(isCorrect, points, trivia, isTimeout) {
     
     document.getElementById('trivia-text').innerText = trivia;
     slideTo('screen-intermediate');
-    
-    // Auto-focus sur le bouton "Question suivante" pour valider direct à l'Entrée
-    setTimeout(() => {
-        let nextBtn = document.querySelector('#screen-intermediate .main-btn');
-        if(nextBtn) nextBtn.focus();
-    }, 400);
 }
 
 function goToNextQuestion() {
     currentQIndex++;
     if (currentQIndex < totalQuestions) {
-        slideTo('screen-game'); 
-        setTimeout(() => loadQuestion(), 400);
-    } else { 
-        triggerSuspense(); 
-    }
+        slideTo('screen-game'); setTimeout(() => loadQuestion(), 400);
+    } else { triggerSuspense(); }
 }
 
 function triggerSuspense() {
@@ -434,7 +410,9 @@ async function showResults() {
         if (snapshot.exists()) {
             const scoresObj = snapshot.val();
             for (let key in scoresObj) {
-                if (scoresObj[key]["Score Points"] > scoreTotal) { rank++; }
+                if (scoresObj[key]["Score Points"] > scoreTotal) {
+                    rank++;
+                }
             }
         }
     } catch(e) { console.error("Erreur classement", e); }
@@ -447,11 +425,6 @@ async function showResults() {
 
     saveScoreFirebase(playerName, scoreTotal, bestCat, playerEmail);
     slideTo('screen-results');
-    
-    setTimeout(() => {
-        let homeBtn = document.querySelector('#screen-results .main-btn');
-        if(homeBtn) homeBtn.focus();
-    }, 400);
 }
 
 // ==========================================
@@ -479,7 +452,9 @@ async function showPodium() {
         let data = [];
         if (snapshot.exists()) {
             const scoresObj = snapshot.val();
-            for (let key in scoresObj) { data.push({ id: key, ...scoresObj[key] }); }
+            for (let key in scoresObj) {
+                data.push({ id: key, ...scoresObj[key] });
+            }
         }
         
         data.sort((a, b) => b["Score Points"] - a["Score Points"]);
@@ -514,7 +489,6 @@ async function openModal(playerId) {
         let allPlayers = Object.values(scoresObj);
         let player = { id: playerId, ...scoresObj[playerId] };
         
-        // Calcul des stats de questions
         let globalStats = {};
         allPlayers.forEach(p => {
             if(p.SessionDetails) {
@@ -555,12 +529,14 @@ async function openModal(playerId) {
                 </tr>`;
             });
         } else {
-            tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;">Aucun détail disponible.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;">Aucun détail disponible pour cette session.</td></tr>`;
         }
         
         document.getElementById('details-modal').classList.add('show');
         
-    } catch (error) { console.error("Erreur de modale:", error); }
+    } catch (error) {
+        console.error("Erreur lors de l'ouverture de la modale:", error);
+    }
 }
 
 function closeModal() {
@@ -569,16 +545,16 @@ function closeModal() {
 
 async function toggleKeep(playerId, isChecked) {
     try { await set(ref(db, 'scores/' + playerId + '/keep'), isChecked); } 
-    catch (error) { console.error("Erreur de MAJ:", error); }
+    catch (error) { console.error("Erreur lors de la mise à jour (conserver):", error); }
 }
 
 async function resetPodium() {
     let pwd = await askPassword();
     if (pwd === ADMIN_PASSWORD) {
-        if (confirm("⚠️ Voulez-vous vraiment effacer TOUS les scores ? Action irréversible.")) {
+        if (confirm("⚠️ ATTENTION ! Voulez-vous vraiment effacer TOUS les scores de la base de données ?\n\nCette action est totalement irréversible.")) {
             try {
                 await set(ref(db, 'scores'), null);
-                alert("🗑️ Base de données réinitialisée !");
+                alert("🗑️ Base de données réinitialisée avec succès !");
                 showPodium();
             } catch (error) { alert("Erreur lors de la suppression."); }
         }
@@ -725,10 +701,14 @@ document.addEventListener('keydown', function(e) {
         }
     }
 
-    // --- TOUCHE ENTRÉE (Valider / Suivant) ---
+    // --- TOUCHE ENTRÉE (Valider de manière contextuelle) ---
     if (e.key === 'Enter') {
         if (activeScreen && activeScreen.id === 'screen-start' && document.activeElement.id === 'player-name') {
             startQuiz(); // Valide le prénom
+        } else if (activeScreen && activeScreen.id === 'screen-intermediate') {
+            goToNextQuestion(); // Valide l'écran de points
+        } else if (activeScreen && activeScreen.id === 'screen-results') {
+            goToStart(); // Ramène au menu
         }
     }
 
@@ -737,19 +717,23 @@ document.addEventListener('keydown', function(e) {
         if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
             e.preventDefault(); // Empêche la page de scroller
             
-            // On récupère tous les boutons de réponse qui ne sont pas désactivés
             const btns = Array.from(document.querySelectorAll('#answers-container .answer-btn:not(:disabled)'));
             if (btns.length === 0) return;
 
-            let currentIndex = btns.indexOf(document.activeElement); // Où est le curseur ?
+            let currentIndex = btns.indexOf(document.activeElement);
 
-            if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
-                currentIndex = (currentIndex + 1) % btns.length; // Passe au suivant
-            } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
-                currentIndex = (currentIndex - 1 + btns.length) % btns.length; // Passe au précédent
+            // Si rien n'est sélectionné, la première flèche sélectionne la 1ère réponse
+            if (currentIndex === -1) {
+                btns[0].focus();
+            } else {
+                // Navigation circulaire
+                if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+                    currentIndex = (currentIndex + 1) % btns.length; 
+                } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+                    currentIndex = (currentIndex - 1 + btns.length) % btns.length;
+                }
+                btns[currentIndex].focus(); 
             }
-
-            btns[currentIndex].focus(); // Déplace le curseur
         }
     }
 });
