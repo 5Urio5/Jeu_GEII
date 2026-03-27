@@ -69,12 +69,10 @@ button.secondary-btn { background-color: #3498db; color: white; font-size: 1.2em
 .answer-btn:active:not(:disabled) { transform: scale(0.98); }
 .answer-btn:disabled { cursor: not-allowed; opacity: 1; }
 
-/* Ce bloc ne s'active QUE si on navigue avec le clavier ! */
+/* Ce bloc ne s'active QUE si on navigue avec le clavier (flèches) ! Fini le flash aveuglant */
 .answer-btn:focus-visible {
     outline: 4px solid #f1c40f;
-    background-color: #fdf5e6;
     transform: scale(1.02);
-    box-shadow: 0 0 15px rgba(241, 196, 15, 0.8);
 }
 
 .btn-correct { background-color: #2ecc71 !important; color: white !important; border-color: #27ae60 !important; }
@@ -95,9 +93,17 @@ button.secondary-btn { background-color: #3498db; color: white; font-size: 1.2em
 .details-layout { display: grid; grid-template-columns: 1fr auto; gap: 20px; align-items: center; margin-bottom: 15px; }
 .details-chart-container { background: rgba(0,0,0,0.2); border-radius: 10px; padding: 10px; width: 250px; height: 250px; }
 
+/* Empêche le "Parcours conseillé" et ses émojis de passer sur 2 lignes */
+#best-path {
+    font-size: 1.4em !important; /* Légèrement plus petit */
+    white-space: nowrap; /* Force sur une seule ligne */
+    overflow: hidden;
+}
+
 @media (max-width: 768px) {
     .results-layout { grid-template-columns: 1fr; }
     .details-layout { grid-template-columns: 1fr; justify-items: center; text-align: center; }
+    #best-path { font-size: 1.2em !important; } /* Encore plus petit sur mobile si besoin */
 }
 
 .admin-tools { margin-top: 40px; display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; }

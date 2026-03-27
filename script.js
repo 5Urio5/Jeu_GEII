@@ -54,7 +54,7 @@ let dynamicDB = [];
 // Graphiques Chart.js instanciés
 let resultsChartInstance = null;
 let modalChartInstance = null;
-let currentViewingPlayerId = null; // Pour le bouton d'export Admin
+let currentViewingPlayerId = null; 
 
 // Poids des difficultés (Crucial pour la justesse du Radar Chart)
 const diffWeights = { "Com": 1, "STI": 2, "BU1": 3, "BU2": 4 };
@@ -66,13 +66,12 @@ async function loadQuestionsFromFirebase() {
         if (snap.exists()) {
             dynamicDB = snap.val();
         } else {
-            // Si Firebase est vide, on injecte les questions par défaut (fichier questions.js)
             await set(ref(db, 'questions'), DB);
             dynamicDB = DB;
         }
     } catch (error) {
         console.error("Erreur de chargement des questions, utilisation locale.", error);
-        dynamicDB = DB; // Secours
+        dynamicDB = DB; 
     }
 }
 loadQuestionsFromFirebase();
@@ -162,7 +161,6 @@ async function startQuiz() {
     let safeName = sanitizeString(rawName); document.getElementById('player-name').blur(); 
     if (!audioCtx) audioCtx = new AudioContextClass(); if (audioCtx.state === 'suspended') audioCtx.resume();
 
-    // Vérification base
     try {
         const snapshot = await get(ref(db, 'scores'));
         if (snapshot.exists()) {
@@ -178,7 +176,6 @@ async function startQuiz() {
     playerName = safeName; scoresPoints = {AII: 0, EME: 0, ESE: 0}; scoresCount = {AII: 0, EME: 0, ESE: 0};
     scoreTotal = 0; currentStreak = 0; currentQIndex = 0; playerSessionDetails = [];
     
-    // Sélection depuis la base dynamique
     let selected = [];
     ['AII', 'EME', 'ESE'].forEach(cat => {
         let catQ = dynamicDB.filter(q => q.cat === cat);
@@ -246,7 +243,6 @@ function processAnswer(selectedIndex, correctIndex, clickedBtn) {
         allBtns.forEach(b => { if (parseInt(b.dataset.idx) === correctIndex) b.classList.add('btn-correct'); });
     }
     
-    // LA CORRECTION EST LÀ : on sauvegarde "diff" et "correctAnsText" pour le PDF et le Graphique
     playerSessionDetails.push({ 
         cat: qData.cat, 
         diff: qData.diff, 
@@ -281,10 +277,24 @@ function goToNextQuestion() {
 // ==========================================
 // RÉSULTATS ET GRAPHIQUES RADAR
 // ==========================================
+
+// Le "Plugin" de Chart.js qui peint le fond en bleu nuit lors de la création du PDF !
+const customCanvasBackgroundColor = {
+    id: 'customCanvasBackgroundColor',
+    beforeDraw: (chart, args, options) => {
+        const {ctx} = chart;
+        ctx.save();
+        ctx.globalCompositeOperation = 'destination-over';
+        ctx.fillStyle = options.color || '#1c2541'; // Bleu nuit par défaut
+        ctx.fillRect(0, 0, chart.width, chart.height);
+        ctx.restore();
+    }
+};
+
 function calculateRadarData(sessionDetails) {
     let stats = { AII: {max:0, val:0}, EME: {max:0, val:0}, ESE: {max:0, val:0} };
     sessionDetails.forEach(q => {
-        let w = diffWeights[q.diff] || 1; // La difficulté est maintenant bien récupérée !
+        let w = diffWeights[q.diff] || 1; 
         if(stats[q.cat]) {
             stats[q.cat].max += w;
             if(q.isCorrect) stats[q.cat].val += w;
@@ -312,12 +322,16 @@ function drawRadarChart(canvasId, dataArray, chartInstanceToUpdate) {
                 borderWidth: 2
             }]
         },
+        plugins: [customCanvasBackgroundColor], // On attache le plugin de fond
         options: {
-            animation: false, // OBLIGATOIRE : Prévient les erreurs de rendu lors de la création du PDF !
+            animation: false, 
             scales: {
                 r: { angleLines: { color: 'rgba(255, 255, 255, 0.2)' }, grid: { color: 'rgba(255, 255, 255, 0.2)' }, pointLabels: { color: '#fff', font: { size: 14, weight: 'bold' } }, ticks: { display: false, min: 0, max: 100, stepSize: 20 } }
             },
-            plugins: { legend: { display: false } }
+            plugins: { 
+                legend: { display: false },
+                customCanvasBackgroundColor: { color: '#1c2541' } // Exécute le fond bleu
+            }
         }
     });
 }
@@ -335,7 +349,6 @@ async function showResults() {
     document.getElementById('scores-display').innerHTML = htmlScores;
     document.getElementById('best-path').innerText = `👉 PARCOURS CONSEILLÉ : ${bestCat} 👈`;
 
-    // Dessine le Radar Chart
     let radarData = calculateRadarData(playerSessionDetails);
     resultsChartInstance = drawRadarChart('results-chart', radarData, resultsChartInstance);
 
@@ -387,9 +400,8 @@ async function openModal(playerId) {
         let scoresObj = snapshot.val(); let allPlayers = Object.values(scoresObj);
         let player = { id: playerId, ...scoresObj[playerId] };
         
-        currentViewingPlayerId = playerId; // Mémorise pour l'export PDF Admin
+        currentViewingPlayerId = playerId;
 
-        // Dessine le graphique pour la modale
         if(player.SessionDetails) {
             let radarData = calculateRadarData(player.SessionDetails);
             modalChartInstance = drawRadarChart('modal-chart', radarData, modalChartInstance);
@@ -465,32 +477,32 @@ async function downloadExcel() {
 }
 
 // ==========================================
-// EXPORT PDF (Bilan Individuel Corrigé)
+// EXPORT PDF (Bilan Individuel Parfait)
 // ==========================================
 function buildPDF(playerData, chartDataUrl) {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
     
-    // Fonction qui finit de générer le PDF une fois le logo chargé (ou échoué)
     const finishPDF = (logoUrl) => {
         if(logoUrl) {
-            doc.addImage(logoUrl, 'PNG', 15, 10, 60, 20); // Logo bien placé en haut à gauche
+            // Centré parfait : page 210mm. X=75, Largeur=60 (75+30 = 105).
+            doc.addImage(logoUrl, 'PNG', 75, 10, 60, 18);
         }
         
-        doc.setFont("helvetica", "bold"); doc.setFontSize(22);
-        doc.text("BILAN DE COMPÉTENCES GEII", 105, 20, {align: "center"});
+        doc.setFont("helvetica", "bold"); doc.setFontSize(20);
+        doc.text("BILAN DE COMPÉTENCES GEII", 105, 38, {align: "center"});
         
         doc.setFontSize(14); doc.setTextColor(0, 102, 204);
-        doc.text(`Candidat : ${playerData.Candidat}`, 15, 45);
+        doc.text(`Candidat : ${playerData.Candidat}`, 15, 50);
         
         doc.setTextColor(0, 0, 0); doc.setFontSize(12);
-        doc.text(`Score Final : ${playerData["Score Points"] || scoreTotal} pts`, 15, 55);
+        doc.text(`Score Final : ${playerData["Score Points"] || scoreTotal} pts`, 15, 58);
         
         let profil = playerData.Profil || document.getElementById('best-path').innerText.replace('👉 PARCOURS CONSEILLÉ : ', '').replace(' 👈', '');
-        doc.text(`Profil Recommandé : ${profil}`, 15, 65);
+        doc.text(`Profil Recommandé : ${profil}`, 15, 66);
 
-        // On glisse le radar chart en haut à droite
-        if(chartDataUrl) { doc.addImage(chartDataUrl, 'PNG', 120, 25, 75, 75); }
+        // Positionnement du graphique sous l'en-tête (avec le fond bleu nuit capturé !)
+        if(chartDataUrl) { doc.addImage(chartDataUrl, 'PNG', 120, 40, 75, 75); }
 
         let tableData = [];
         if(playerData.SessionDetails) {
@@ -499,9 +511,9 @@ function buildPDF(playerData, chartDataUrl) {
             });
         }
 
-        // On abaisse le point de départ du tableau à 110 pour aérer l'en-tête
+        // Démarrage du tableau de réponse bien plus bas pour éviter la superposition
         doc.autoTable({
-            startY: 110,
+            startY: 120,
             head: [['Catégorie', 'Question Posée', 'Résultat', 'Bonne Réponse']],
             body: tableData,
             headStyles: { fillColor: [46, 204, 113] },
@@ -512,10 +524,10 @@ function buildPDF(playerData, chartDataUrl) {
         doc.save(`Bilan_GEII_${playerData.Candidat}.pdf`);
     };
 
-    // On force le navigateur à télécharger le logo noir, même si l'écran est en mode sombre !
+    // On charge explicitement le logo noir par-dessus le reste
     const imgElement = new Image();
     imgElement.crossOrigin = "anonymous";
-    imgElement.src = "logo_noir.png"; // On ne dépend plus du HTML
+    imgElement.src = "logo_noir.png"; 
     
     imgElement.onload = () => {
         const canvas = document.createElement('canvas');
@@ -523,9 +535,7 @@ function buildPDF(playerData, chartDataUrl) {
         canvas.getContext('2d').drawImage(imgElement, 0, 0);
         finishPDF(canvas.toDataURL('image/png'));
     };
-    imgElement.onerror = () => { 
-        finishPDF(null); // Si le logo plante, on génère le PDF sans lui
-    }; 
+    imgElement.onerror = () => { finishPDF(null); }; 
 }
 
 function generatePlayerPDF() {
