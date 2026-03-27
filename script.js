@@ -500,16 +500,20 @@ async function openModal(playerId) {
             }
         });
 
-        let isChecked = player.keep ? "checked" : "";
-        document.getElementById('modal-header-content').innerHTML = `
-            <h2 style="color:#f1c40f; margin-top:0; display:inline-block;">Analyse de : ${player.Candidat}</h2>
-            <label class="keep-label">
-                <input type="checkbox" onchange="toggleKeep('${player.id}', this.checked)" ${isChecked}> 
-                📌 Conserver
-            </label>
-        `;
-        
-        let tbody = document.getElementById('modal-table-body'); tbody.innerHTML = '';
-        
-        player.SessionDetails.forEach(q => {
-            let resIcon = q.isCorrect ? `<span class="correct-cell">✅</span>
+let isChecked = player.keep ? "checked" : "";
+document.getElementById('modal-header-content').innerHTML = `
+    <h2 style="color:#f1c40f; margin-top:0; display:inline-block;">Analyse de : ${player.Candidat}</h2>
+    <label class="keep-label">
+        <input type="checkbox" onchange="toggleKeep('${player.id}', this.checked)" ${isChecked}> 
+        📌 Conserver
+    </label>
+`;
+
+let tbody = document.getElementById('modal-table-body'); 
+tbody.innerHTML = '';
+
+player.SessionDetails.forEach(q => {
+    let resIcon = q.isCorrect ? `<span class="correct-cell">✅</span>` : `<span class="incorrect-cell">❌</span>`;
+    tbody.innerHTML += `<tr><td>${resIcon}</td></tr>`;
+});
+}
