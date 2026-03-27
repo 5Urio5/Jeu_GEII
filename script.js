@@ -187,7 +187,7 @@ function slideTo(screenId) {
 function goToStart() {
     document.getElementById('player-name').value = '';
     setRandomBackground(); 
-    // resetIdleTimer(); // J'ai désactivé ça car la fonction n'est pas dans le code fourni
+    resetIdleTimer();
     slideTo('screen-start');
     setTimeout(() => { document.getElementById('player-name').focus(); }, 500);
 }
@@ -275,7 +275,7 @@ async function startQuiz() {
 }
 
 function loadQuestion() {
-    // resetIdleTimer(); 
+    resetIdleTimer(); 
     setRandomBackground(); 
     clearInterval(timerInterval); timeLeft = timeLimit;
     
@@ -347,7 +347,7 @@ function processAnswer(selectedIndex, correctIndex, clickedBtn) {
 }
 
 function showIntermediateScreen(isCorrect, points, trivia, isTimeout) {
-    // resetIdleTimer();
+    resetIdleTimer();
     let title = document.getElementById('intermediate-title');
     let ptsText = document.getElementById('intermediate-points');
     let streakText = document.getElementById('intermediate-streak');
@@ -391,7 +391,7 @@ function triggerSuspense() {
 // RÉSULTATS & RÉCOLTE DE MAIL (TOP 3)
 // ==========================================
 async function showResults() {
-    // resetIdleTimer();
+    resetIdleTimer();
     let htmlScores = ""; let bestCat = ""; let maxScore = -1;
     
     for (let cat of ["AII", "EME", "ESE"]) {
@@ -442,7 +442,7 @@ function saveScoreFirebase(name, totalScore, profil, email) {
 }
 
 async function showPodium() {
-    // resetIdleTimer();
+    resetIdleTimer();
     slideTo('screen-podium');
     let tbody = document.getElementById('podium-body'); 
     
@@ -518,8 +518,139 @@ async function openModal(playerId) {
             tbody.innerHTML += `<tr><td>${resIcon}</td></tr>`;
         });
         
-    // LA VOICI ! La fermeture du try et le catch qui manquait :
     } catch (error) {
         console.error("Erreur lors de l'ouverture de la modale:", error);
     }
 }
+
+// ==========================================
+// FONCTIONS MANQUANTES : MODALE, EXPORT EXCEL ET ÉCRAN DE VEILLE
+// ==========================================
+
+function closeModal() {
+    document.getElementById('details-modal').classList.remove('show');
+}
+
+async function toggleKeep(playerId, isChecked) {
+    try {
+        await set(ref(db, 'scores/' + playerId + '/keep'), isChecked);
+    } catch (error) {
+        console.error("Erreur lors de la mise à jour (conserver):", error);
+    }
+}
+
+async function resetPodium() {
+    let pwd = await askPassword();
+    if (pwd === ADMIN_PASSWORD) {
+        if (confirm("⚠️ ATTENTION ! Voulez-vous vraiment effacer TOUS les scores de la base de données ?\n\nCette action est totalement irréversible.")) {
+            try {
+                await set(ref(db, 'scores'), null);
+                alert("🗑️ Base de données réinitialisée avec succès !");
+                showPodium();
+            } catch (error) {
+                console.error("Erreur de suppression:", error);
+                alert("Erreur lors de la suppression.");
+            }
+        }
+    } else if (pwd !== null) {
+        alert("❌ Mot de passe incorrect.");
+    }
+}
+
+async function downloadExcel() {
+    let pwd = await askPassword();
+    if (pwd === ADMIN_PASSWORD) {
+        try {
+            const snapshot = await get(ref(db, 'scores'));
+            if (!snapshot.exists()) return alert("Aucune donnée à exporter.");
+            
+            let data = [];
+            const scoresObj = snapshot.val();
+            
+            for (let key in scoresObj) {
+                let p = scoresObj[key];
+                data.push({
+                    "Candidat": p.Candidat || "Inconnu",
+                    "Score Global": p["Score Points"] || 0,
+                    "Profil": p.Profil || "",
+                    "Points AII": p.ScoresPoints ? p.ScoresPoints.AII : 0,
+                    "Points EME": p.ScoresPoints ? p.ScoresPoints.EME : 0,
+                    "Points ESE": p.ScoresPoints ? p.ScoresPoints.ESE : 0,
+                    "Bonnes Rép. AII": p.ScoresCount ? p.ScoresCount.AII : 0,
+                    "Bonnes Rép. EME": p.ScoresCount ? p.ScoresCount.EME : 0,
+                    "Bonnes Rép. ESE": p.ScoresCount ? p.ScoresCount.ESE : 0,
+                    "Email Contact": p.Email || "",
+                    "Conserver (Épinglé)": p.keep ? "OUI" : "NON"
+                });
+            }
+            
+            // Trie les données par score décroissant
+            data.sort((a, b) => b["Score Global"] - a["Score Global"]);
+            
+            // Création du fichier Excel via la librairie XLSX
+            const ws = window.XLSX.utils.json_to_sheet(data);
+            const wb = window.XLSX.utils.book_new();
+            window.XLSX.utils.book_append_sheet(wb, ws, "Scores_GEII");
+            window.XLSX.writeFile(wb, "Resultats_Jeu_GEII.xlsx");
+            
+        } catch (e) {
+            console.error("Erreur lors de l'export Excel:", e);
+            alert("Erreur lors de la création du fichier Excel.");
+        }
+    } else if (pwd !== null) {
+        alert("❌ Mot de passe incorrect.");
+    }
+}
+
+// ==========================================
+// GESTION DE L'ÉCRAN DE VEILLE (Inactivité)
+// ==========================================
+function resetIdleTimer() {
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(showScreensaver, IDLE_TIME);
+}
+
+// Relance le chrono si le joueur bouge la souris, clique ou tape au clavier
+document.addEventListener('mousemove', resetIdleTimer);
+document.addEventListener('keypress', resetIdleTimer);
+document.addEventListener('click', resetIdleTimer);
+document.addEventListener('touchstart', resetIdleTimer);
+
+async function showScreensaver() {
+    const screen = document.getElementById('screensaver');
+    screen.classList.remove('hidden');
+    
+    let scrollContent = document.getElementById('screensaver-scroll');
+    scrollContent.innerHTML = 'Chargement du classement...';
+    
+    try {
+        const snapshot = await get(ref(db, 'scores'));
+        if (snapshot.exists()) {
+            let data = Object.values(snapshot.val());
+            data.sort((a, b) => b["Score Points"] - a["Score Points"]);
+            
+            // Ne prend que le TOP 10 pour l'écran de veille
+            let top10 = data.slice(0, 10); 
+            
+            let html = "";
+            top10.forEach((p, i) => {
+                let medaille = i === 0 ? "🥇" : (i === 1 ? "🥈" : (i === 2 ? "🥉" : `${i+1}.`));
+                html += `<div>${medaille} ${p.Candidat} - ${p["Score Points"]} pts</div>`;
+            });
+            // Double le texte pour que le défilement CSS boucle sans coupure
+            scrollContent.innerHTML = html + "<br><br><br>" + html;
+        } else {
+            scrollContent.innerHTML = "Soyez le premier à jouer !";
+        }
+    } catch (error) {
+        scrollContent.innerHTML = "Prêt à jouer !";
+    }
+}
+
+function hideScreensaver() {
+    document.getElementById('screensaver').classList.add('hidden');
+    resetIdleTimer();
+}
+
+// Lance le timer une première fois au chargement de la page
+resetIdleTimer();
