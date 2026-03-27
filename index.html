@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>En GEII tout est permis !</title>
-    <link rel="icon" type="image/png" href="logo_onglet_noir.png?v=9">
-    <link rel="icon" type="image/png" href="logo_onglet_blanc.png?v=9" media="(prefers-color-scheme: dark)">
+    <link rel="icon" type="image/png" href="logo_onglet_noir.png?v=11">
+    <link rel="icon" type="image/png" href="logo_onglet_blanc.png?v=11" media="(prefers-color-scheme: dark)">
     
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
@@ -13,7 +13,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
 
-    <link rel="stylesheet" href="style.css?v=10">
+    <link rel="stylesheet" href="style.css?v=11">
 </head>
 <body>
 
@@ -22,16 +22,18 @@
 
         <div class="logo-container">
             <picture>
-                <source srcset="logo_blanc.png?v=9" media="(prefers-color-scheme: dark)">
-                <img id="main-logo" src="logo_noir.png?v=9" alt="Logo GEII" crossorigin="anonymous">
+                <source srcset="logo_blanc.png?v=11" media="(prefers-color-scheme: dark)">
+                <img id="main-logo" src="logo_noir.png?v=11" alt="Logo GEII" crossorigin="anonymous">
             </picture>
         </div>
 
         <h1>🎮 EN GEII TOUT EST PERMIS 🎮</h1>
         <h2>L'Épreuve Ultime : 30 Questions pour trouver ta voie !</h2>
         <input type="text" id="player-name" placeholder="Tapez votre prénom ici" autocomplete="off" maxlength="15">
-        <br><button class="main-btn" onclick="startQuiz()">LANCER LE JEU</button>
+        <br>
+        <button class="main-btn" onclick="startQuiz()">LANCER LE JEU</button>
         <button class="secondary-btn" onclick="showPodium()">🏆 Voir le Podium</button>
+        
         <div class="admin-tools">
             <button class="btn-discret" onclick="downloadExcel()">[ Exporter Statistiques ]</button>
             <button class="btn-discret" onclick="openQuestionEditor()">[ Gérer les Questions ]</button>
@@ -45,8 +47,12 @@
             <span id="timer-text">⏱️ 30s</span>
             <span style="visibility: hidden;">Fantome</span>
         </div>
-        <div id="timer-container"><div id="timer-bar"></div></div>
-        <div id="question-box"><div id="question-text">Question ici...</div></div>
+        <div id="timer-container">
+            <div id="timer-bar"></div>
+        </div>
+        <div id="question-box">
+            <div id="question-text">Question ici...</div>
+        </div>
         <div id="answers-container"></div>
         <div id="progress-container"></div>
     </div>
@@ -56,7 +62,10 @@
         <h1 id="intermediate-title">Bonne réponse !</h1>
         <div id="intermediate-points">+ 850 pts</div>
         <div id="intermediate-streak">Série : 3 🔥</div>
-        <div class="trivia-box"><strong>Le saviez-vous ?</strong><br><br><span id="trivia-text">Anecdote...</span></div>
+        <div class="trivia-box">
+            <strong>Le saviez-vous ?</strong><br><br>
+            <span id="trivia-text">Anecdote...</span>
+        </div>
         <button class="main-btn" onclick="goToNextQuestion()">Question suivante ➡️</button>
     </div>
 
@@ -88,10 +97,19 @@
     <div id="screen-podium" class="container hidden slide-in-right">
         <h1>🏆 CLASSEMENT GÉNÉRAL 🏆</h1>
         <table class="podium-table">
-            <thead><tr><th>Rang</th><th>Prénom</th><th>Points</th><th>Profil</th><th>Actions</th></tr></thead>
+            <thead>
+                <tr>
+                    <th>Rang</th>
+                    <th>Prénom</th>
+                    <th>Points</th>
+                    <th>Profil</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
             <tbody id="podium-body"></tbody>
         </table>
-        <br><br><button class="main-btn" onclick="goToStart()">RETOUR AU MENU</button>
+        <br><br>
+        <button class="main-btn" onclick="goToStart()">RETOUR AU MENU</button>
         <div class="admin-tools">
             <button class="btn-discret" onclick="resetPodium()">[ Réinitialiser la Base de Données ]</button>
         </div>
@@ -112,7 +130,16 @@
             </div>
 
             <table class="stat-table">
-                <thead><tr><th>Cat.</th><th>Diff.</th><th>Question</th><th>Résultat</th><th>Points</th><th>Réussite Globale</th></tr></thead>
+                <thead>
+                    <tr>
+                        <th>Cat.</th>
+                        <th>Diff.</th>
+                        <th>Question</th>
+                        <th>Résultat</th>
+                        <th>Points</th>
+                        <th>Réussite Globale</th>
+                    </tr>
+                </thead>
                 <tbody id="modal-table-body"></tbody>
             </table>
         </div>
@@ -126,11 +153,21 @@
                 <button class="secondary-btn" style="background-color: #2ecc71;" onclick="addNewQuestion()">+ Ajouter une question</button>
                 <button class="secondary-btn" style="background-color: #e74c3c;" onclick="resetQuestionsToDefault()">⚠️ Restaurer questions par défaut</button>
             </div>
+            
             <div id="editor-form-container" class="hidden" style="background: rgba(0,0,0,0.4); padding: 15px; border-radius: 10px; margin-bottom: 20px;">
                 </div>
+            
             <div style="max-height: 50vh; overflow-y: auto;">
                 <table class="stat-table">
-                    <thead><tr><th>ID</th><th>Cat.</th><th>Diff.</th><th>Question</th><th>Action</th></tr></thead>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Cat.</th>
+                            <th>Diff.</th>
+                            <th>Question</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
                     <tbody id="editor-table-body"></tbody>
                 </table>
             </div>
@@ -155,16 +192,18 @@
     <div id="screensaver" class="hidden" onclick="hideScreensaver()">
         <div class="logo-container" style="margin-bottom: 50px;">
             <picture>
-                <source srcset="logo_blanc.png?v=9" media="(prefers-color-scheme: dark)">
-                <img src="logo_noir.png?v=9" alt="Logo GEII">
+                <source srcset="logo_blanc.png?v=11" media="(prefers-color-scheme: dark)">
+                <img src="logo_noir.png?v=11" alt="Logo GEII">
             </picture>
         </div>
         <h1>LE MUR DES CHAMPIONS</h1>
-        <div class="scroll-container"><div class="scroll-content" id="screensaver-scroll"></div></div>
+        <div class="scroll-container">
+            <div class="scroll-content" id="screensaver-scroll"></div>
+        </div>
         <div class="touch-to-start">👆 Touchez l'écran pour jouer ! 👆</div>
     </div>
 
     <script src="questions.js"></script>
-    <script type="module" src="script.js?v=10"></script>
+    <script type="module" src="script.js?v=11"></script>
 </body>
 </html>
