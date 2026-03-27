@@ -43,7 +43,7 @@ window.goToNextQuestion = goToNextQuestion;
 window.togglePasswordVisibility = togglePasswordVisibility;
 
 // ==========================================
-// 🛡️ SÉCURITÉ : NETTOYEUR XSS (Anti-Injections)
+// 🛡️ SÉCURITÉ : NETTOYEUR XSS
 // ==========================================
 function sanitizeString(str) {
     return str.replace(/[&<>'"]/g, function(tag) {
@@ -53,7 +53,7 @@ function sanitizeString(str) {
 }
 
 // ==========================================
-// 🛡️ SÉCURITÉ : SYSTÈME DE MOT DE PASSE MASQUÉ
+// 🛡️ MODALE DU MOT DE PASSE (PROMESSE)
 // ==========================================
 function askPassword() {
     return new Promise((resolve) => {
@@ -127,7 +127,7 @@ let idleTimer;
 const IDLE_TIME = 120000; 
 
 // ==========================================
-// GESTION AUDIO
+// GESTION AUDIO (Synthétiseur)
 // ==========================================
 const AudioContextClass = window.AudioContext || window.webkitAudioContext;
 let audioCtx;
@@ -179,7 +179,7 @@ function slideTo(screenId) {
     }
     const nextScreen = document.getElementById(screenId);
     nextScreen.classList.remove('hidden'); nextScreen.classList.add('slide-in-right');
-    void nextScreen.offsetWidth;
+    void nextScreen.offsetWidth; // Force le reflow
     nextScreen.classList.remove('slide-in-right'); nextScreen.classList.add('active-screen');
 }
 
@@ -188,7 +188,7 @@ function goToStart() {
     setRandomBackground(); 
     resetIdleTimer();
     slideTo('screen-start');
-    setTimeout(() => { document.getElementById('player-name').focus(); }, 500);
+    setTimeout(() => { document.getElementById('player-name').focus(); }, 400); // Focus auto sur l'input
 }
 
 function cancelQuiz() {
@@ -212,6 +212,7 @@ async function startQuiz() {
     let safeName = sanitizeString(rawName);
     document.getElementById('player-name').blur(); 
     
+    // Débloque l'audio navigateur
     if (!audioCtx) audioCtx = new AudioContextClass();
     if (audioCtx.state === 'suspended') audioCtx.resume();
 
@@ -234,7 +235,7 @@ async function startQuiz() {
         return; 
     }
 
-    // 🛡️ VÉRIFICATION ANTI-DOUBLONS
+    // 🛡️ VÉRIFICATION ANTI-DOUBLONS FIREBASE
     try {
         const snapshot = await get(ref(db, 'scores'));
         if (snapshot.exists()) {
@@ -247,11 +248,13 @@ async function startQuiz() {
         }
     } catch(e) { console.error("Erreur de connexion pour la vérification du nom", e); }
 
+    // Initialisation
     playerName = safeName;
     scoresPoints = {AII: 0, EME: 0, ESE: 0};
     scoresCount = {AII: 0, EME: 0, ESE: 0};
     scoreTotal = 0; currentStreak = 0; currentQIndex = 0; playerSessionDetails = [];
     
+    // Génération aléatoire des questions
     let selected = [];
     ['AII', 'EME', 'ESE'].forEach(cat => {
         let catQ = DB.filter(q => q.cat === cat);
@@ -270,7 +273,8 @@ async function startQuiz() {
 
     document.getElementById('player-display').innerHTML = `👤 ${playerName} <span style="margin-left:20px; color:#f1c40f;" id="live-score">0 pts</span>`;
     
-    slideTo('screen-game'); loadQuestion();
+    slideTo('screen-game'); 
+    loadQuestion();
 }
 
 function loadQuestion() {
@@ -287,14 +291,22 @@ function loadQuestion() {
     
     let container = document.getElementById('answers-container'); container.innerHTML = ''; 
     let options = qData.opt.map((text, index) => ({text, originalIndex: index}));
-    options.sort(() => 0.5 - Math.random());
+    options.sort(() => 0.5 - Math.random()); // Mélange des réponses
     
-    options.forEach(opt => {
+    options.forEach((opt, arrayIndex) => {
         let btn = document.createElement('button');
-        btn.className = 'answer-btn'; btn.innerText = opt.text; btn.dataset.idx = opt.originalIndex; 
+        btn.className = 'answer-btn'; 
+        btn.innerText = opt.text; 
+        btn.dataset.idx = opt.originalIndex; 
         btn.onclick = (e) => processAnswer(opt.originalIndex, qData.ans, e.target);
         container.appendChild(btn);
     });
+
+    // Auto-focus sur la première réponse pour faciliter la navigation au clavier !
+    setTimeout(() => {
+        let firstBtn = document.querySelector('.answer-btn');
+        if (firstBtn) firstBtn.focus();
+    }, 100);
 
     timerInterval = setInterval(() => {
         timeLeft--; updateTimerText();
@@ -342,7 +354,10 @@ function processAnswer(selectedIndex, correctIndex, clickedBtn) {
     });
 
     document.getElementById('live-score').innerText = `${scoreTotal} pts`;
-    setTimeout(() => { showIntermediateScreen(isCorrect, pointsGained, qData.trivia, isTimeout); }, 1500);
+    
+    setTimeout(() => { 
+        showIntermediateScreen(isCorrect, pointsGained, qData.trivia, isTimeout); 
+    }, 1500);
 }
 
 function showIntermediateScreen(isCorrect, points, trivia, isTimeout) {
@@ -369,13 +384,22 @@ function showIntermediateScreen(isCorrect, points, trivia, isTimeout) {
     
     document.getElementById('trivia-text').innerText = trivia;
     slideTo('screen-intermediate');
+    
+    // Auto-focus sur le bouton "Question suivante" pour valider direct à l'Entrée
+    setTimeout(() => {
+        let nextBtn = document.querySelector('#screen-intermediate .main-btn');
+        if(nextBtn) nextBtn.focus();
+    }, 400);
 }
 
 function goToNextQuestion() {
     currentQIndex++;
     if (currentQIndex < totalQuestions) {
-        slideTo('screen-game'); setTimeout(() => loadQuestion(), 400);
-    } else { triggerSuspense(); }
+        slideTo('screen-game'); 
+        setTimeout(() => loadQuestion(), 400);
+    } else { 
+        triggerSuspense(); 
+    }
 }
 
 function triggerSuspense() {
@@ -387,7 +411,7 @@ function triggerSuspense() {
 }
 
 // ==========================================
-// RÉSULTATS & RÉCOLTE DE MAIL (TOP 3)
+// RÉSULTATS & RÉCOLTE DE MAIL
 // ==========================================
 async function showResults() {
     resetIdleTimer();
@@ -410,9 +434,7 @@ async function showResults() {
         if (snapshot.exists()) {
             const scoresObj = snapshot.val();
             for (let key in scoresObj) {
-                if (scoresObj[key]["Score Points"] > scoreTotal) {
-                    rank++;
-                }
+                if (scoresObj[key]["Score Points"] > scoreTotal) { rank++; }
             }
         }
     } catch(e) { console.error("Erreur classement", e); }
@@ -425,6 +447,11 @@ async function showResults() {
 
     saveScoreFirebase(playerName, scoreTotal, bestCat, playerEmail);
     slideTo('screen-results');
+    
+    setTimeout(() => {
+        let homeBtn = document.querySelector('#screen-results .main-btn');
+        if(homeBtn) homeBtn.focus();
+    }, 400);
 }
 
 // ==========================================
@@ -452,9 +479,7 @@ async function showPodium() {
         let data = [];
         if (snapshot.exists()) {
             const scoresObj = snapshot.val();
-            for (let key in scoresObj) {
-                data.push({ id: key, ...scoresObj[key] });
-            }
+            for (let key in scoresObj) { data.push({ id: key, ...scoresObj[key] }); }
         }
         
         data.sort((a, b) => b["Score Points"] - a["Score Points"]);
@@ -489,7 +514,7 @@ async function openModal(playerId) {
         let allPlayers = Object.values(scoresObj);
         let player = { id: playerId, ...scoresObj[playerId] };
         
-        // Calcul des statistiques globales pour chaque question
+        // Calcul des stats de questions
         let globalStats = {};
         allPlayers.forEach(p => {
             if(p.SessionDetails) {
@@ -516,12 +541,10 @@ async function openModal(playerId) {
         if (player.SessionDetails) {
             player.SessionDetails.forEach(q => {
                 let resIcon = q.isCorrect ? `<span class="correct-cell">✅</span>` : `<span class="incorrect-cell">❌</span>`;
-                
                 let successRate = "-";
                 if (globalStats[q.q] && globalStats[q.q].asked > 0) {
                     successRate = Math.round((globalStats[q.q].correct / globalStats[q.q].asked) * 100) + "%";
                 }
-
                 tbody.innerHTML += `<tr>
                     <td style="text-align:center;">${q.cat}</td>
                     <td>${q.q}</td>
@@ -532,48 +555,34 @@ async function openModal(playerId) {
                 </tr>`;
             });
         } else {
-            tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;">Aucun détail disponible pour cette session.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;">Aucun détail disponible.</td></tr>`;
         }
         
         document.getElementById('details-modal').classList.add('show');
         
-    } catch (error) {
-        console.error("Erreur lors de l'ouverture de la modale:", error);
-    }
+    } catch (error) { console.error("Erreur de modale:", error); }
 }
-
-// ==========================================
-// OUTILS ADMINISTRATEUR (Export, Modale, etc.)
-// ==========================================
 
 function closeModal() {
     document.getElementById('details-modal').classList.remove('show');
 }
 
 async function toggleKeep(playerId, isChecked) {
-    try {
-        await set(ref(db, 'scores/' + playerId + '/keep'), isChecked);
-    } catch (error) {
-        console.error("Erreur lors de la mise à jour (conserver):", error);
-    }
+    try { await set(ref(db, 'scores/' + playerId + '/keep'), isChecked); } 
+    catch (error) { console.error("Erreur de MAJ:", error); }
 }
 
 async function resetPodium() {
     let pwd = await askPassword();
     if (pwd === ADMIN_PASSWORD) {
-        if (confirm("⚠️ ATTENTION ! Voulez-vous vraiment effacer TOUS les scores de la base de données ?\n\nCette action est totalement irréversible.")) {
+        if (confirm("⚠️ Voulez-vous vraiment effacer TOUS les scores ? Action irréversible.")) {
             try {
                 await set(ref(db, 'scores'), null);
-                alert("🗑️ Base de données réinitialisée avec succès !");
+                alert("🗑️ Base de données réinitialisée !");
                 showPodium();
-            } catch (error) {
-                console.error("Erreur de suppression:", error);
-                alert("Erreur lors de la suppression.");
-            }
+            } catch (error) { alert("Erreur lors de la suppression."); }
         }
-    } else if (pwd !== null) {
-        alert("❌ Mot de passe incorrect.");
-    }
+    } else if (pwd !== null) { alert("❌ Mot de passe incorrect."); }
 }
 
 async function downloadExcel() {
@@ -583,18 +592,12 @@ async function downloadExcel() {
             const snapshot = await get(ref(db, 'scores'));
             if (!snapshot.exists()) return alert("Aucune donnée à exporter.");
             
-            let dataPlayers = [];
-            let dataQuestions = [];
-            let dataDetails = [];
-            
+            let dataPlayers = []; let dataQuestions = []; let dataDetails = [];
             const scoresObj = snapshot.val();
             let allPlayers = Object.values(scoresObj);
             
-            // --- 1. COMPILATION DES STATS JOUEURS & DÉTAILS SESSIONS ---
             for (let key in scoresObj) {
                 let p = scoresObj[key];
-                
-                // Remplissage de l'onglet Joueurs
                 dataPlayers.push({
                     "Candidat": p.Candidat || "Inconnu",
                     "Score Global": p["Score Points"] || 0,
@@ -609,33 +612,23 @@ async function downloadExcel() {
                     "Conserver (Épinglé)": p.keep ? "OUI" : "NON"
                 });
                 
-                // Remplissage de l'onglet Détail Sessions (Historique complet)
                 if (p.SessionDetails) {
                     p.SessionDetails.forEach((q, index) => {
                         dataDetails.push({
-                            "Candidat": p.Candidat,
-                            "Numéro Question": index + 1,
-                            "Catégorie": q.cat,
-                            "Question": q.q,
-                            "Résultat": q.isCorrect ? "VRAI" : "FAUX",
-                            "Temps de réponse (s)": q.time,
-                            "Points Gagnés": q.points
+                            "Candidat": p.Candidat, "Numéro Question": index + 1, "Catégorie": q.cat,
+                            "Question": q.q, "Résultat": q.isCorrect ? "VRAI" : "FAUX",
+                            "Temps de réponse (s)": q.time, "Points Gagnés": q.points
                         });
                     });
                 }
             }
-            
-            // Trie les joueurs par score décroissant
             dataPlayers.sort((a, b) => b["Score Global"] - a["Score Global"]);
             
-            // --- 2. STATISTIQUES GLOBALES DES QUESTIONS ---
             let globalStats = {};
             allPlayers.forEach(p => {
                 if (p.SessionDetails) {
                     p.SessionDetails.forEach(q => {
-                        if (!globalStats[q.q]) {
-                            globalStats[q.q] = { cat: q.cat, asked: 0, correct: 0 };
-                        }
+                        if (!globalStats[q.q]) { globalStats[q.q] = { cat: q.cat, asked: 0, correct: 0 }; }
                         globalStats[q.q].asked++;
                         if (q.isCorrect) globalStats[q.q].correct++;
                     });
@@ -646,44 +639,23 @@ async function downloadExcel() {
                 let stat = globalStats[qText];
                 let successRate = stat.asked > 0 ? Math.round((stat.correct / stat.asked) * 100) + "%" : "0%";
                 dataQuestions.push({
-                    "Catégorie": stat.cat,
-                    "Question": qText,
-                    "Fois Posée": stat.asked,
-                    "Bonnes Réponses": stat.correct,
-                    "Taux de Réussite": successRate
+                    "Catégorie": stat.cat, "Question": qText, "Fois Posée": stat.asked,
+                    "Bonnes Réponses": stat.correct, "Taux de Réussite": successRate
                 });
             }
-            
-            // Trie les questions par Catégorie pour un affichage plus propre
             dataQuestions.sort((a, b) => a.Catégorie.localeCompare(b.Catégorie));
             
-            // --- 3. CRÉATION DU FICHIER EXCEL MULTI-ONGLETS ---
             const wb = window.XLSX.utils.book_new();
-            
-            // Onglet 1 : Les joueurs
-            const wsPlayers = window.XLSX.utils.json_to_sheet(dataPlayers);
-            window.XLSX.utils.book_append_sheet(wb, wsPlayers, "Classement Joueurs");
-            
-            // Onglet 2 : Les Questions
-            const wsQuestions = window.XLSX.utils.json_to_sheet(dataQuestions);
-            window.XLSX.utils.book_append_sheet(wb, wsQuestions, "Stats Questions");
-            
-            // Onglet 3 : Le détail brut
+            window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(dataPlayers), "Classement Joueurs");
+            window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(dataQuestions), "Stats Questions");
             if(dataDetails.length > 0) {
-                const wsDetails = window.XLSX.utils.json_to_sheet(dataDetails);
-                window.XLSX.utils.book_append_sheet(wb, wsDetails, "Détail Sessions");
+                window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(dataDetails), "Détail Sessions");
             }
             
-            // Lancement du téléchargement
             window.XLSX.writeFile(wb, "Resultats_Jeu_GEII.xlsx");
             
-        } catch (e) {
-            console.error("Erreur lors de l'export Excel:", e);
-            alert("Erreur lors de la création du fichier Excel.");
-        }
-    } else if (pwd !== null) {
-        alert("❌ Mot de passe incorrect.");
-    }
+        } catch (e) { alert("Erreur lors de la création du fichier Excel."); }
+    } else if (pwd !== null) { alert("❌ Mot de passe incorrect."); }
 }
 
 // ==========================================
@@ -694,7 +666,6 @@ function resetIdleTimer() {
     idleTimer = setTimeout(showScreensaver, IDLE_TIME);
 }
 
-// Relance le chrono si le joueur bouge la souris, clique ou tape au clavier
 document.addEventListener('mousemove', resetIdleTimer);
 document.addEventListener('keypress', resetIdleTimer);
 document.addEventListener('click', resetIdleTimer);
@@ -713,37 +684,72 @@ async function showScreensaver() {
             let data = Object.values(snapshot.val());
             data.sort((a, b) => b["Score Points"] - a["Score Points"]);
             
-            // Ne prend que le TOP 10 pour l'écran de veille
             let top10 = data.slice(0, 10); 
-            
             let html = "";
             top10.forEach((p, i) => {
                 let medaille = i === 0 ? "🥇" : (i === 1 ? "🥈" : (i === 2 ? "🥉" : `${i+1}.`));
                 html += `<div>${medaille} ${p.Candidat} - ${p["Score Points"]} pts</div>`;
             });
-            // Double le texte pour que le défilement CSS boucle sans coupure
             scrollContent.innerHTML = html + "<br><br><br>" + html;
-        } else {
-            scrollContent.innerHTML = "Soyez le premier à jouer !";
-        }
-    } catch (error) {
-        scrollContent.innerHTML = "Prêt à jouer !";
-    }
+        } else { scrollContent.innerHTML = "Soyez le premier à jouer !"; }
+    } catch (error) { scrollContent.innerHTML = "Prêt à jouer !"; }
 }
 
 function hideScreensaver() {
     document.getElementById('screensaver').classList.add('hidden');
     resetIdleTimer();
 }
-
-// Lance le timer une première fois au chargement de la page
 resetIdleTimer();
 
 // ==========================================
-// ÉCOUTEUR TOUCHE ENTRÉE (Lancement du jeu)
+// SUPER ÉCOUTEUR CLAVIER (ENTRÉE, ECHAP, FLÈCHES)
 // ==========================================
-document.getElementById('player-name').addEventListener('keypress', function (e) {
+document.addEventListener('keydown', function(e) {
+    const activeScreen = document.querySelector('.active-screen');
+    const detailsModal = document.getElementById('details-modal');
+    const pwdModal = document.getElementById('password-modal');
+    const screensaver = document.getElementById('screensaver');
+
+    // Quitte l'écran de veille dès qu'une touche est pressée
+    if (!screensaver.classList.contains('hidden')) { hideScreensaver(); return; }
+
+    // --- TOUCHE ECHAP (Annuler / Fermer) ---
+    if (e.key === 'Escape') {
+        if (detailsModal.classList.contains('show')) {
+            closeModal();
+        } else if (!pwdModal.classList.contains('show') && activeScreen) {
+            // Echap annule le quiz si on est en train de jouer
+            if (activeScreen.id === 'screen-game' || activeScreen.id === 'screen-intermediate') {
+                cancelQuiz();
+            }
+        }
+    }
+
+    // --- TOUCHE ENTRÉE (Valider / Suivant) ---
     if (e.key === 'Enter') {
-        startQuiz();
+        if (activeScreen && activeScreen.id === 'screen-start' && document.activeElement.id === 'player-name') {
+            startQuiz(); // Valide le prénom
+        }
+    }
+
+    // --- FLÈCHES DIRECTIONNELLES (Voyager entre les réponses) ---
+    if (activeScreen && activeScreen.id === 'screen-game') {
+        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+            e.preventDefault(); // Empêche la page de scroller
+            
+            // On récupère tous les boutons de réponse qui ne sont pas désactivés
+            const btns = Array.from(document.querySelectorAll('#answers-container .answer-btn:not(:disabled)'));
+            if (btns.length === 0) return;
+
+            let currentIndex = btns.indexOf(document.activeElement); // Où est le curseur ?
+
+            if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+                currentIndex = (currentIndex + 1) % btns.length; // Passe au suivant
+            } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+                currentIndex = (currentIndex - 1 + btns.length) % btns.length; // Passe au précédent
+            }
+
+            btns[currentIndex].focus(); // Déplace le curseur
+        }
     }
 });
