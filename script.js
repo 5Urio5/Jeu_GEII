@@ -187,7 +187,8 @@ function slideTo(screenId) {
 function goToStart() {
     document.getElementById('player-name').value = '';
     setRandomBackground(); 
-    resetIdleTimer(); slideTo('screen-start');
+    // resetIdleTimer(); // J'ai désactivé ça car la fonction n'est pas dans le code fourni
+    slideTo('screen-start');
     setTimeout(() => { document.getElementById('player-name').focus(); }, 500);
 }
 
@@ -274,7 +275,7 @@ async function startQuiz() {
 }
 
 function loadQuestion() {
-    resetIdleTimer(); 
+    // resetIdleTimer(); 
     setRandomBackground(); 
     clearInterval(timerInterval); timeLeft = timeLimit;
     
@@ -346,7 +347,7 @@ function processAnswer(selectedIndex, correctIndex, clickedBtn) {
 }
 
 function showIntermediateScreen(isCorrect, points, trivia, isTimeout) {
-    resetIdleTimer();
+    // resetIdleTimer();
     let title = document.getElementById('intermediate-title');
     let ptsText = document.getElementById('intermediate-points');
     let streakText = document.getElementById('intermediate-streak');
@@ -390,7 +391,7 @@ function triggerSuspense() {
 // RÉSULTATS & RÉCOLTE DE MAIL (TOP 3)
 // ==========================================
 async function showResults() {
-    resetIdleTimer();
+    // resetIdleTimer();
     let htmlScores = ""; let bestCat = ""; let maxScore = -1;
     
     for (let cat of ["AII", "EME", "ESE"]) {
@@ -441,7 +442,7 @@ function saveScoreFirebase(name, totalScore, profil, email) {
 }
 
 async function showPodium() {
-    resetIdleTimer();
+    // resetIdleTimer();
     slideTo('screen-podium');
     let tbody = document.getElementById('podium-body'); 
     
@@ -500,20 +501,25 @@ async function openModal(playerId) {
             }
         });
 
-let isChecked = player.keep ? "checked" : "";
-document.getElementById('modal-header-content').innerHTML = `
-    <h2 style="color:#f1c40f; margin-top:0; display:inline-block;">Analyse de : ${player.Candidat}</h2>
-    <label class="keep-label">
-        <input type="checkbox" onchange="toggleKeep('${player.id}', this.checked)" ${isChecked}> 
-        📌 Conserver
-    </label>
-`;
+        let isChecked = player.keep ? "checked" : "";
+        document.getElementById('modal-header-content').innerHTML = `
+            <h2 style="color:#f1c40f; margin-top:0; display:inline-block;">Analyse de : ${player.Candidat}</h2>
+            <label class="keep-label">
+                <input type="checkbox" onchange="toggleKeep('${player.id}', this.checked)" ${isChecked}> 
+                📌 Conserver
+            </label>
+        `;
 
-let tbody = document.getElementById('modal-table-body'); 
-tbody.innerHTML = '';
+        let tbody = document.getElementById('modal-table-body'); 
+        tbody.innerHTML = '';
 
-player.SessionDetails.forEach(q => {
-    let resIcon = q.isCorrect ? `<span class="correct-cell">✅</span>` : `<span class="incorrect-cell">❌</span>`;
-    tbody.innerHTML += `<tr><td>${resIcon}</td></tr>`;
-});
+        player.SessionDetails.forEach(q => {
+            let resIcon = q.isCorrect ? `<span class="correct-cell">✅</span>` : `<span class="incorrect-cell">❌</span>`;
+            tbody.innerHTML += `<tr><td>${resIcon}</td></tr>`;
+        });
+        
+    // LA VOICI ! La fermeture du try et le catch qui manquait :
+    } catch (error) {
+        console.error("Erreur lors de l'ouverture de la modale:", error);
+    }
 }
