@@ -4,9 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>En GEII tout est permis !</title>
+    
+    <link rel="icon" type="image/png" href="logo_onglet_noir.png?v=8">
+    <link rel="icon" type="image/png" href="logo_onglet_blanc.png?v=8" media="(prefers-color-scheme: dark)">
+    
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
-    <link rel="stylesheet" href="style.css?v=6">
+    <link rel="stylesheet" href="style.css?v=8">
 </head>
 <body>
 
@@ -15,14 +19,14 @@
 
         <div class="logo-container">
             <picture>
-                <source srcset="logo_blanc.png?v=6" media="(prefers-color-scheme: dark)">
-                <img src="logo_noir.png?v=6" alt="Logo GEII" onerror="this.style.display='none'; this.parentElement.innerHTML='<h2 style=\'color:#f1c40f;margin:0\'>GEII - Univ Lille</h2>';">
+                <source srcset="logo_blanc.png?v=8" media="(prefers-color-scheme: dark)">
+                <img src="logo_noir.png?v=8" alt="Logo GEII" onerror="this.style.display='none'; this.parentElement.innerHTML='<h2 style=\'color:#f1c40f;margin:0\'>GEII - Univ Lille</h2>';">
             </picture>
         </div>
 
         <h1>🎮 EN GEII TOUT EST PERMIS 🎮</h1>
         <h2>L'Épreuve Ultime : 30 Questions pour trouver ta voie !</h2>
-        <input type="text" id="player-name" placeholder="Tapez votre prénom ici" autocomplete="off">
+        <input type="text" id="player-name" placeholder="Tapez votre prénom ici" autocomplete="off" maxlength="15">
         <br><button class="main-btn" onclick="startQuiz()">LANCER LE JEU</button>
         <button class="secondary-btn" onclick="showPodium()">🏆 Voir le Podium</button>
         <div class="admin-tools">
@@ -95,16 +99,16 @@
     <div id="screensaver" class="hidden" onclick="hideScreensaver()">
         <div class="logo-container" style="margin-bottom: 50px;">
             <picture>
-                <source srcset="logo_blanc.png?v=6" media="(prefers-color-scheme: dark)">
-                <img src="logo_noir.png?v=6" alt="Logo GEII">
+                <source srcset="logo_blanc.png?v=8" media="(prefers-color-scheme: dark)">
+                <img src="logo_noir.png?v=8" alt="Logo GEII">
             </picture>
         </div>
         <h1>LE MUR DES CHAMPIONS</h1>
         <div class="scroll-container"><div class="scroll-content" id="screensaver-scroll"></div></div>
-        <div class="touch-to-start">👆 Touchez l'écran pour jouer !</div>
+        <div class="touch-to-start">👆 Touchez l'écran pour jouer ! 👆</div>
     </div>
 
     <script src="questions.js"></script>
-    <script type="module" src="script.js?v=6"></script>
+    <script type="module" src="script.js?v=8"></script>
 </body>
 </html>

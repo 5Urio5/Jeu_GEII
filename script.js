@@ -1,6 +1,13 @@
 /* global DB, confetti, XLSX */
 
 // ==========================================
+// 🔒 SÉCURITÉ : MOT DE PASSE ADMINISTRATEUR
+// ==========================================
+// Change ce mot de passe ici. Il protège les boutons de Réinitialisation et d'Export Excel.
+const ADMIN_PASSWORD = "iutgeii";
+
+
+// ==========================================
 // FIREBASE - CONNEXION BASE DE DONNÉES TEMPS RÉEL
 // ==========================================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
@@ -35,6 +42,16 @@ window.downloadExcel = downloadExcel;
 window.showScreensaver = showScreensaver;
 window.hideScreensaver = hideScreensaver;
 window.goToNextQuestion = goToNextQuestion;
+
+// ==========================================
+// 🛡️ SÉCURITÉ : NETTOYEUR XSS (Anti-Injections)
+// ==========================================
+function sanitizeString(str) {
+    return str.replace(/[&<>'"]/g, function(tag) {
+        const charsToReplace = { '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' };
+        return charsToReplace[tag] || tag;
+    });
+}
 
 // ==========================================
 // FONDS D'ÉCRAN DYNAMIQUES
@@ -142,10 +159,13 @@ function getRandom(arr, n) {
 // ==========================================
 // MOTEUR DU QUIZ
 // ==========================================
-function startQuiz() {
-    let nameInput = document.getElementById('player-name').value.trim();
-    if (!nameInput) return alert("Hé ! N'oublie pas de taper ton prénom !");
+async function startQuiz() {
+    let rawName = document.getElementById('player-name').value.trim();
+    if (!rawName) return alert("Hé ! N'oublie pas de taper ton prénom !");
     
+    // Nettoyage de sécurité (Anti-XSS)
+    let safeName = sanitizeString(rawName);
+
     document.getElementById('player-name').blur(); 
     
     if (!audioCtx) audioCtx = new AudioContextClass();
@@ -154,7 +174,7 @@ function startQuiz() {
     // ========================================================
     // 🔥 CHEAT CODE / EASTER EGG POUR "MANON"
     // ========================================================
-    if (nameInput.toLowerCase() === "manon") {
+    if (safeName.toLowerCase() === "manon") {
         playerName = "Manon";
         scoresCount = {AII: 5, EME: 7, ESE: 6}; 
         scoresPoints = {AII: 4433, EME: 6451, ESE: 5567}; 
@@ -173,7 +193,20 @@ function startQuiz() {
     }
     // ========================================================
 
-    playerName = nameInput;
+    // 🛡️ VÉRIFICATION ANTI-DOUBLONS DANS LA BASE DE DONNÉES
+    try {
+        const snapshot = await get(ref(db, 'scores'));
+        if (snapshot.exists()) {
+            const scoresObj = snapshot.val();
+            for (let key in scoresObj) {
+                if (scoresObj[key].Candidat.toLowerCase() === safeName.toLowerCase()) {
+                    return alert("⚠️ Ce prénom est déjà pris sur le classement !\n\nEssaie de rajouter l'initiale de ton nom de famille (ex: " + safeName + " D).");
+                }
+            }
+        }
+    } catch(e) { console.error("Erreur de connexion pour la vérification du nom", e); }
+
+    playerName = safeName;
     scoresPoints = {AII: 0, EME: 0, ESE: 0};
     scoresCount = {AII: 0, EME: 0, ESE: 0};
     scoreTotal = 0; currentStreak = 0; currentQIndex = 0; playerSessionDetails = [];
@@ -306,10 +339,16 @@ function goToNextQuestion() {
 
 function triggerSuspense() {
     slideTo('screen-suspense'); playSound('drumroll');
-    setTimeout(() => { showResults(); window.confetti({ particleCount: 150, spread: 100, origin: { y: 0.6 }, zIndex: 10000 }); }, 3000);
+    setTimeout(async () => { 
+        await showResults(); 
+        window.confetti({ particleCount: 150, spread: 100, origin: { y: 0.6 }, zIndex: 10000 }); 
+    }, 3000);
 }
 
-function showResults() {
+// ==========================================
+// RÉSULTATS & RÉCOLTE DE MAIL (TOP 3)
+// ==========================================
+async function showResults() {
     resetIdleTimer();
     let htmlScores = ""; let bestCat = ""; let maxScore = -1;
     
@@ -324,18 +363,39 @@ function showResults() {
     document.getElementById('scores-display').innerHTML = htmlScores;
     document.getElementById('best-path').innerText = `👉 PARCOURS CONSEILLÉ : ${bestCat} 👈`;
 
-    saveScoreFirebase(playerName, scoreTotal, bestCat);
+    // 🏆 CALCUL DU CLASSEMENT EN DIRECT POUR L'E-MAIL
+    let rank = 1;
+    try {
+        const snapshot = await get(ref(db, 'scores'));
+        if (snapshot.exists()) {
+            const scoresObj = snapshot.val();
+            for (let key in scoresObj) {
+                if (scoresObj[key]["Score Points"] > scoreTotal) {
+                    rank++;
+                }
+            }
+        }
+    } catch(e) { console.error("Erreur classement", e); }
+
+    let playerEmail = "";
+    if (rank <= 3) {
+        let emailPrompt = prompt(`🎉 INCROYABLE ! Tu te hisses à la place #${rank} du classement mondial !\n\nLaisse-nous ton adresse e-mail pour que l'on puisse te recontacter si tu restes sur le podium :`);
+        if (emailPrompt) playerEmail = sanitizeString(emailPrompt.trim());
+    }
+
+    saveScoreFirebase(playerName, scoreTotal, bestCat, playerEmail);
     slideTo('screen-results');
 }
 
 // ==========================================
 // FIREBASE : SAUVEGARDE, PODIUM & EXPORT
 // ==========================================
-function saveScoreFirebase(name, totalScore, profil) {
+function saveScoreFirebase(name, totalScore, profil, email) {
     let newEntry = {
         "Candidat": name, "Score Points": totalScore, "Profil": profil,
         "ScoresCount": scoresCount, "ScoresPoints": scoresPoints, "SessionDetails": playerSessionDetails,
-        "keep": false 
+        "keep": false,
+        "Email": email || "" 
     };
     push(ref(db, 'scores'), newEntry);
 }
@@ -439,10 +499,10 @@ async function toggleKeep(playerId, isKept) {
     await set(ref(db, 'scores/' + playerId + '/keep'), isKept);
 }
 
-// 🔒 FONCTION SÉCURISÉE PAR MOT DE PASSE
+// 🔒 FONCTION SÉCURISÉE PAR MOT DE PASSE VARIABLE
 async function resetPodium() {
     let pwd = prompt("⚠️ ZONE ADMINISTRATEUR ⚠️\nVeuillez entrer le mot de passe pour réinitialiser la base de données :");
-    if (pwd !== "iutgeii") {
+    if (pwd !== ADMIN_PASSWORD) {
         if (pwd !== null) alert("❌ Mot de passe incorrect ! Action annulée.");
         return;
     }
@@ -463,10 +523,10 @@ async function resetPodium() {
     }
 }
 
-// 🔒 FONCTION SÉCURISÉE PAR MOT DE PASSE
+// 🔒 FONCTION SÉCURISÉE PAR MOT DE PASSE VARIABLE
 async function downloadExcel() {
     let pwd = prompt("⚠️ ZONE ADMINISTRATEUR ⚠️\nVeuillez entrer le mot de passe pour télécharger le rapport Excel :");
-    if (pwd !== "iutgeii") {
+    if (pwd !== ADMIN_PASSWORD) {
         if (pwd !== null) alert("❌ Mot de passe incorrect ! Action annulée.");
         return;
     }
@@ -490,8 +550,12 @@ async function downloadExcel() {
     });
 
     let wb = window.XLSX.utils.book_new();
+    // 📧 AJOUT DE LA COLONNE E-MAIL DANS L'EXCEL EXPORTÉ
     let exportJoueurs = dataJoueurs.map(j => ({
-        "Candidat": j.Candidat, "Score Global": j["Score Points"], "Profil": j.Profil,
+        "Candidat": j.Candidat, 
+        "Adresse E-mail": j.Email || "Non fournie",
+        "Score Global": j["Score Points"], 
+        "Profil": j.Profil,
         "AII (Bonnes Rép.)": j.ScoresCount.AII + "/10", "AII (Points)": j.ScoresPoints.AII,
         "EME (Bonnes Rép.)": j.ScoresCount.EME + "/10", "EME (Points)": j.ScoresPoints.EME,
         "ESE (Bonnes Rép.)": j.ScoresCount.ESE + "/10", "ESE (Points)": j.ScoresPoints.ESE
