@@ -63,7 +63,6 @@ function askPassword() {
         const cancelBtn = document.getElementById('cancel-pwd-btn');
         const toggleBtn = document.getElementById('toggle-pwd-btn');
 
-        // Réinitialisation de l'affichage
         input.value = '';
         input.type = 'password';
         toggleBtn.innerText = '👁️';
@@ -518,6 +517,9 @@ async function openModal(playerId) {
             tbody.innerHTML += `<tr><td>${resIcon}</td></tr>`;
         });
         
+        // C'est cette ligne qui affiche la modale !
+        document.getElementById('details-modal').classList.add('show');
+        
     } catch (error) {
         console.error("Erreur lors de l'ouverture de la modale:", error);
     }
@@ -654,3 +656,12 @@ function hideScreensaver() {
 
 // Lance le timer une première fois au chargement de la page
 resetIdleTimer();
+
+// ==========================================
+// ÉCOUTEUR TOUCHE ENTRÉE (Lancement du jeu)
+// ==========================================
+document.getElementById('player-name').addEventListener('keypress', function (e) {
+    if (e.key === 'Enter') {
+        startQuiz();
+    }
+});
