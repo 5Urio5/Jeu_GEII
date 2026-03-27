@@ -1,4 +1,4 @@
-/* global DB, confetti, XLSX, Chart, jspdf */
+/* global DB, confetti, XLSX, Chart, jspdf, ChartDataLabels */
 
 // ==========================================
 // 🔒 SÉCURITÉ : MOT DE PASSE ADMINISTRATEUR
@@ -79,7 +79,7 @@ let resultsChartInstance = null;
 let modalChartInstance = null;
 let currentViewingPlayerId = null; 
 
-// Poids des difficultés pour la justesse du Radar Chart
+// Poids des difficultés (Crucial pour la justesse du Radar Chart)
 const diffWeights = { "Com": 1, "STI": 2, "BU1": 3, "BU2": 4 };
 
 // Chargement des questions depuis Firebase
@@ -376,7 +376,6 @@ function loadQuestion() {
 function processAnswer(selectedIndex, correctIndex, clickedBtn) {
     clearInterval(timerInterval);
     
-    // Désactive les boutons pour éviter les clics multiples
     let allBtns = document.querySelectorAll('.answer-btn'); 
     allBtns.forEach(b => b.disabled = true);
     
@@ -407,7 +406,6 @@ function processAnswer(selectedIndex, correctIndex, clickedBtn) {
         });
     }
     
-    // Enregistrement des détails de la question pour l'historique et le PDF
     playerSessionDetails.push({ 
         cat: qData.cat, 
         diff: qData.diff, 
@@ -482,7 +480,7 @@ function goToNextQuestion() {
 // RÉSULTATS ET GRAPHIQUES RADAR
 // ==========================================
 
-// Plugin de Chart.js : Peint le fond en bleu nuit lors de la création du PDF !
+// Le "Plugin" de Chart.js qui peint le fond en bleu nuit lors de la création du PDF !
 const customCanvasBackgroundColor = {
     id: 'customCanvasBackgroundColor',
     beforeDraw: (chart, args, options) => {
@@ -536,9 +534,13 @@ function drawRadarChart(canvasId, dataArray, chartInstanceToUpdate) {
                 borderWidth: 2
             }]
         },
-        plugins: [customCanvasBackgroundColor], 
+        // Ajout du plugin officiel Datalabels + notre fond personnalisé
+        plugins: [customCanvasBackgroundColor, window.ChartDataLabels], 
         options: {
-            animation: false, 
+            animation: false,
+            layout: {
+                padding: 15 // Laisse de la place pour que les % ne soient pas coupés
+            },
             scales: {
                 r: { 
                     angleLines: { color: 'rgba(255, 255, 255, 0.2)' }, 
@@ -549,7 +551,16 @@ function drawRadarChart(canvasId, dataArray, chartInstanceToUpdate) {
             },
             plugins: { 
                 legend: { display: false },
-                customCanvasBackgroundColor: { color: '#1c2541' } 
+                customCanvasBackgroundColor: { color: '#1c2541' },
+                datalabels: { // Configuration pour afficher les pourcentages en permanence
+                    color: '#f1c40f',
+                    font: { weight: 'bold', size: 14 },
+                    formatter: function(value) {
+                        return value + '%';
+                    },
+                    align: 'end',
+                    anchor: 'end'
+                }
             }
         }
     });
@@ -843,54 +854,40 @@ async function downloadExcel() {
 }
 
 // ==========================================
-// EXPORT PDF (Zéro Emoji = Zéro Bug, Net et Précis)
+// EXPORT PDF AVEC CONCLUSION ET QR CODE
 // ==========================================
 function buildPDF(playerData, chartDataUrl) {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
     
     const finalize = (logoUrl, qrUrl) => {
-        let currentY = 15;
-
-        // 1. Placement propre du LOGO (Calcul ratio dynamique)
+        // En-tête (Logo et Titre)
         if(logoUrl) { 
-            let imgProps = doc.getImageProperties(logoUrl);
-            let pdfWidth = 60; // On fige la largeur à 60mm
-            let pdfHeight = (imgProps.height * pdfWidth) / imgProps.width; // Calcul parfait de la hauteur
-            doc.addImage(logoUrl, 'PNG', 75, currentY, pdfWidth, pdfHeight); 
-            currentY += pdfHeight + 10;
-        } else {
-            currentY += 20;
+            doc.addImage(logoUrl, 'PNG', 75, 10, 60, 18); 
         }
         
-        // 2. Titre et Infos
         doc.setFont("helvetica", "bold"); 
-        doc.setFontSize(22);
-        doc.setTextColor(44, 62, 80); // Bleu marine élégant
-        doc.text("BILAN DE COMPÉTENCES GEII", 105, currentY, {align: "center"});
-        currentY += 15;
+        doc.setFontSize(20);
+        doc.text("BILAN DE COMPÉTENCES GEII", 105, 38, {align: "center"});
         
+        // Infos Joueur
         doc.setFontSize(14); 
-        doc.setTextColor(41, 128, 185); // Bleu clair
-        doc.text(`Candidat : ${playerData.Candidat}`, 15, currentY);
+        doc.setTextColor(0, 102, 204);
+        doc.text(`Candidat : ${playerData.Candidat}`, 15, 50);
         
-        doc.setTextColor(52, 73, 94); // Gris anthracite foncé
+        doc.setTextColor(0, 0, 0); 
         doc.setFontSize(12);
-        doc.setFont("helvetica", "normal");
-        doc.text(`Score Final : ${playerData["Score Points"] || scoreTotal} pts`, 15, currentY + 8);
+        doc.text(`Score Final : ${playerData["Score Points"] || scoreTotal} pts`, 15, 58);
         
         let profil = playerData.Profil || document.getElementById('best-path').innerText.replace('👉 PARCOURS CONSEILLÉ : ', '').replace(' 👈', '');
-        doc.setFont("helvetica", "bold");
-        doc.text(`Profil Recommandé : ${profil}`, 15, currentY + 16);
+        doc.text(`Profil Recommandé : ${profil}`, 15, 66);
 
-        // 3. Graphique (Positionné élégamment à droite)
+        // Graphique Radar
         if(chartDataUrl) { 
-            doc.addImage(chartDataUrl, 'PNG', 115, currentY - 10, 80, 80); 
+            doc.addImage(chartDataUrl, 'PNG', 120, 40, 75, 75); 
         }
 
-        currentY += 85;
-
-        // 4. Tableau Zébré et Propre
+        // Tableau
         let tableData = [];
         if(playerData.SessionDetails) { 
             playerData.SessionDetails.forEach(q => { 
@@ -899,88 +896,75 @@ function buildPDF(playerData, chartDataUrl) {
         }
         
         doc.autoTable({
-            startY: currentY,
+            startY: 120,
             head: [['Catégorie', 'Question Posée', 'Résultat', 'Bonne Réponse']],
             body: tableData,
-            headStyles: { fillColor: [46, 204, 113], textColor: 255, fontStyle: 'bold' },
-            styles: { font: 'helvetica', fontSize: 10, textColor: 50, cellPadding: 4 },
-            alternateRowStyles: { fillColor: [245, 245, 245] },
-            columnStyles: { 0: { cellWidth: 20, halign: 'center' }, 1: { cellWidth: 90 }, 2: { cellWidth: 20, halign: 'center', fontStyle: 'bold' }, 3: { cellWidth: 50 } }
+            headStyles: { fillColor: [46, 204, 113] },
+            styles: { fontSize: 9 },
+            columnStyles: { 0: { cellWidth: 20 }, 1: { cellWidth: 90 }, 2: { cellWidth: 20 }, 3: { cellWidth: 50 } }
         });
 
-        // --- 5. CONCLUSION, LIEN CLIQUE ICI ET QR CODE ---
+        // --- CONCLUSION, LIEN ET QR CODE ---
         let finalY = doc.lastAutoTable.finalY + 15;
 
-        // Saut de page de sécurité si on est trop bas
         if (finalY > 230) { 
             doc.addPage(); 
             finalY = 20; 
         }
 
-        // Ligne de séparation esthétique
-        doc.setDrawColor(200, 200, 200);
-        doc.setLineWidth(0.5);
-        doc.line(15, finalY - 8, 195, finalY - 8);
-
         doc.setFont("helvetica", "bold"); 
         doc.setFontSize(14); 
-        doc.setTextColor(41, 128, 185);
+        doc.setTextColor(0, 102, 204);
         doc.text("Et maintenant ?", 15, finalY);
 
-        // Texte d'avertissement
         doc.setFont("helvetica", "italic"); 
         doc.setFontSize(10); 
-        doc.setTextColor(100, 100, 100);
-        let conclusionText = "Ce bilan est issu d'un jeu récréatif scientifique. Il ne définit en rien ton avenir scolaire ou professionnel, mais souligne tes affinités actuelles. L'important est de choisir la voie qui te passionne !";
-        doc.text(conclusionText, 15, finalY + 6, { maxWidth: 130, align: 'justify', lineHeightFactor: 1.5 });
+        doc.setTextColor(80, 80, 80);
+        let conclusionText = "Attention : Ce bilan est issu d'un jeu récréatif scientifique. Il ne définit en rien ton avenir scolaire ou professionnel, mais souligne tes affinités actuelles. L'important est de choisir la voie qui te passionne !";
+        doc.text(conclusionText, 15, finalY + 8, { maxWidth: 120, align: 'justify' });
 
-        // Titre de l'invitation à rejouer
+        // Appel à l'action
         doc.setFont("helvetica", "bold"); 
-        doc.setFontSize(12); 
-        doc.setTextColor(39, 174, 96); // Vert
-        doc.text("Envie de rejouer ou de défier tes amis ?", 15, finalY + 25);
-        
-        // --- LA PHRASE CLIQUE ICI (Sans Emojis) ---
-        doc.setFont("helvetica", "normal"); 
         doc.setFontSize(11); 
-        doc.setTextColor(50, 50, 50);
+        doc.setTextColor(39, 174, 96);
+        let rejouerText = "Envie de rejouer ou de relever le défi entre amis ?";
+        doc.text(rejouerText, 15, finalY + 30);
         
-        let puce = "- ";
-        doc.text(puce, 15, finalY + 33);
-        let puceWidth = doc.getTextWidth(puce);
-        
-        // Lien cliquable et souligné
+        // Texte cliquable et souligné "Clique ici"
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(10);
+        doc.setTextColor(52, 152, 219); 
         let clickText = "Clique ici";
-        doc.setTextColor(41, 128, 185); // Bleu lien
-        doc.text(clickText, 15 + puceWidth, finalY + 33);
-        let clickWidth = doc.getTextWidth(clickText);
-        
-        // Le soulignement précis
-        doc.setDrawColor(41, 128, 185); 
-        doc.setLineWidth(0.3);
-        doc.line(15 + puceWidth, finalY + 34, 15 + puceWidth + clickWidth, finalY + 34); 
-        
-        // Zone cliquable
-        doc.link(15 + puceWidth, finalY + 28, clickWidth, 6, { url: 'https://5urio5.github.io/Jeu_GEII/' }); 
-        
-        // Suite de la phrase (sans colision avec le QR code)
-        doc.setTextColor(50, 50, 50);
-        let suiteText = " pour y accéder, ou scanne le code QR juste ici :";
-        doc.text(suiteText, 15 + puceWidth + clickWidth, finalY + 33);
+        doc.text(clickText, 15, finalY + 36);
 
-        // --- AFFICHAGE DU QR CODE ---
+        // Tracé du soulignement bleu
+        let textWidth = doc.getTextWidth(clickText);
+        doc.setDrawColor(52, 152, 219);
+        doc.setLineWidth(0.3);
+        doc.line(15, finalY + 37, 15 + textWidth, finalY + 37);
+
+        // La zone cliquable invisible
+        doc.link(15, finalY + 32, textWidth, 6, { url: 'https://5urio5.github.io/Jeu_GEII/' }); 
+
+        // Suite de la phrase modifiée
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(80, 80, 80);
+        let suiteText = " pour y accéder, ou scanne le code QR juste ici 👉";
+        doc.text(suiteText, 15 + textWidth + 1, finalY + 36);
+
+        // Ajout du QR Code à droite
         if(qrUrl) {
-            // Positionné sagement à droite (X=145)
             doc.addImage(qrUrl, 'PNG', 145, finalY + 15, 35, 35); 
-            doc.setFontSize(9); 
-            doc.setTextColor(120, 120, 120); 
-            doc.text("Scanne-moi !", 162.5, finalY + 54, { align: "center" });
+            doc.setFontSize(8); 
+            doc.setTextColor(100, 100, 100); 
+            doc.setFont("helvetica", "normal");
+            doc.text("Scannez pour jouer !", 162.5, finalY + 53, { align: "center" });
         }
 
         doc.save(`Bilan_GEII_${playerData.Candidat}.pdf`);
     };
 
-    // Chargement parallèle (Logo + QR Code)
+    // Chargement asynchrone du Logo et du QR Code
     let logoLoaded = false; 
     let logoDataUrl = null;
     let qrLoaded = false; 
@@ -1008,7 +992,7 @@ function buildPDF(playerData, chartDataUrl) {
     };
 
     const imgQR = new Image(); 
-    imgQR.src = "qr_code.png";
+    imgQR.src = "qr_code.png"; 
     imgQR.onload = () => {
         const canvas = document.createElement('canvas'); 
         canvas.width = imgQR.naturalWidth; 
@@ -1033,6 +1017,7 @@ function generatePlayerPDF() {
 
 async function generateAdminPDF() {
     let pwd = await askPassword();
+    
     if (pwd === ADMIN_PASSWORD) {
         if(!currentViewingPlayerId || !modalChartInstance) return;
         try {
@@ -1043,7 +1028,8 @@ async function generateAdminPDF() {
                 buildPDF(pData, chartUrl); 
             }
         } catch(e) { 
-            console.error(e); alert("Erreur lors de la récupération du joueur."); 
+            console.error(e); 
+            alert("Erreur lors de la récupération du joueur."); 
         }
     } else if (pwd !== null) { 
         alert("❌ Mot de passe incorrect."); 
@@ -1055,6 +1041,7 @@ async function generateAdminPDF() {
 // ==========================================
 async function openQuestionEditor() {
     let pwd = await askPassword();
+    
     if (pwd === ADMIN_PASSWORD) { 
         renderEditorList(); 
         document.getElementById('editor-modal').classList.add('show'); 

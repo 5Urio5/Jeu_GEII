@@ -163,26 +163,35 @@ th, td { padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.2); vert
 .touch-to-start { margin-top: 50px; font-size: 2em; animation: pulse 2s infinite; color: #2ecc71; }
 @keyframes pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
 
-/* ADAPTATION MOBILE */
+/* ==========================================
+   ADAPTATION MOBILE & RESPONSIVE
+   ========================================== */
 @media (max-width: 768px) {
+    /* Ajout de padding-top pour repousser le contenu sous les boutons absolus (Croix et Lune) */
+    .container { padding-top: 60px; padding-left: 15px; padding-right: 15px; }
+    
+    /* Réduction et repositionnement des boutons absolus */
+    #btn-manual-screensaver, .btn-cancel-quiz { top: 15px; right: 15px; font-size: 1.6em; }
+    
+    .logo-container { margin-top: 0; padding: 10px 20px; }
+    h1 { font-size: 2.2em; }
+
     .results-layout, .details-layout { grid-template-columns: 1fr; justify-items: center; text-align: center; }
     #best-path { font-size: 1.1em !important; }
     #details-modal h2 { display: block !important; margin-bottom: 5px; text-align: center; }
     .keep-label { float: none; display: inline-flex; margin-right: 0; margin-bottom: 15px; justify-content: center; }
     input[type="text"], input[type="password"] { width: 90%; }
     
-    /* Correction du tableau Podium pour les petits écrans (Scroll horizontal) */
-    .podium-table, .stat-table {
+    .podium-table {
         display: block;
-        overflow-x: auto; 
-        white-space: nowrap; 
+        overflow-x: auto;
+        white-space: nowrap;
         font-size: 1rem;
     }
-    .podium-table th, .podium-table td, .stat-table th, .stat-table td { padding: 8px 10px; }
+    .podium-table th, .podium-table td { padding: 8px 10px; }
     .btn-details { padding: 8px 10px; font-size: 0.85em; }
 }
 
-/* PREFERENCES SOMBRE (MODE NUIT SMARTPHONE) */
 @media (prefers-color-scheme: dark) {
     .logo-container { background-color: rgba(0, 0, 0, 0.6); border: 1px solid rgba(255, 255, 255, 0.2); }
 }
