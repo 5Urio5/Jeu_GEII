@@ -27,9 +27,7 @@ const app = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
 const db = getDatabase(app);
 
-// ==========================================
-// EXPOSITION DES FONCTIONS AU HTML
-// ==========================================
+// Exposition HTML
 window.startQuiz = startQuiz; 
 window.goToStart = goToStart; 
 window.cancelQuiz = cancelQuiz;
@@ -79,7 +77,7 @@ let resultsChartInstance = null;
 let modalChartInstance = null;
 let currentViewingPlayerId = null; 
 
-// Poids des difficultés pour la justesse du Radar Chart
+// Poids des difficultés
 const diffWeights = { "Com": 1, "STI": 2, "BU1": 3, "BU2": 4 };
 
 // Chargement des questions depuis Firebase
@@ -89,7 +87,6 @@ async function loadQuestionsFromFirebase() {
         if (snap.exists()) {
             dynamicDB = snap.val();
         } else {
-            // Premier lancement : copie les questions locales vers Firebase
             await set(ref(db, 'questions'), DB);
             dynamicDB = DB;
         }
@@ -281,7 +278,6 @@ async function startQuiz() {
     if (!audioCtx) audioCtx = new AudioContextClass(); 
     if (audioCtx.state === 'suspended') audioCtx.resume();
 
-    // Vérification de sécurité anti-doublon dans Firebase
     try {
         const snapshot = await get(ref(db, 'scores'));
         if (snapshot.exists()) {
@@ -292,9 +288,7 @@ async function startQuiz() {
                 }
             }
         }
-    } catch(e) { 
-        console.error(e); 
-    }
+    } catch(e) { console.error(e); }
 
     playerName = safeName; 
     scoresPoints = {AII: 0, EME: 0, ESE: 0}; 
@@ -304,7 +298,6 @@ async function startQuiz() {
     currentQIndex = 0; 
     playerSessionDetails = [];
     
-    // Mixage des questions depuis la base de données dynamique
     let selected = [];
     ['AII', 'EME', 'ESE'].forEach(cat => {
         let catQ = dynamicDB.filter(q => q.cat === cat);
@@ -316,7 +309,6 @@ async function startQuiz() {
     });
     currentQuestions = selected.sort(() => 0.5 - Math.random());
     
-    // Génération de la barre de progression
     let progContainer = document.getElementById('progress-container'); 
     progContainer.innerHTML = '';
     
@@ -377,7 +369,6 @@ function loadQuestion() {
 function processAnswer(selectedIndex, correctIndex, clickedBtn) {
     clearInterval(timerInterval);
     
-    // Désactive les boutons pour éviter les clics multiples
     let allBtns = document.querySelectorAll('.answer-btn'); 
     allBtns.forEach(b => b.disabled = true);
     
@@ -408,7 +399,6 @@ function processAnswer(selectedIndex, correctIndex, clickedBtn) {
         });
     }
     
-    // Enregistrement des détails de la question pour l'historique et le PDF
     playerSessionDetails.push({ 
         cat: qData.cat, 
         diff: qData.diff, 
@@ -420,10 +410,7 @@ function processAnswer(selectedIndex, correctIndex, clickedBtn) {
     });
 
     document.getElementById('live-score').innerText = `${scoreTotal} pts`;
-    
-    setTimeout(() => { 
-        showIntermediateScreen(isCorrect, pointsGained, qData.trivia, isTimeout); 
-    }, 1500);
+    setTimeout(() => { showIntermediateScreen(isCorrect, pointsGained, qData.trivia, isTimeout); }, 1500);
 }
 
 function showIntermediateScreen(isCorrect, points, trivia, isTimeout) {
@@ -482,8 +469,6 @@ function goToNextQuestion() {
 // ==========================================
 // RÉSULTATS ET GRAPHIQUES RADAR
 // ==========================================
-
-// Le "Plugin" de Chart.js qui peint le fond en bleu nuit lors de la création du PDF !
 const customCanvasBackgroundColor = {
     id: 'customCanvasBackgroundColor',
     beforeDraw: (chart, args, options) => {
@@ -596,9 +581,7 @@ async function showResults() {
                 } 
             }
         }
-    } catch(e) { 
-        console.error("Erreur classement", e); 
-    }
+    } catch(e) { console.error("Erreur classement", e); }
 
     let playerEmail = "";
     if (rank <= 3) {
@@ -636,7 +619,6 @@ async function showPodium() {
     try {
         const snapshot = await get(ref(db, 'scores')); 
         let data = [];
-        
         if (snapshot.exists()) { 
             const scoresObj = snapshot.val(); 
             for (let key in scoresObj) { 
@@ -718,9 +700,7 @@ async function openModal(playerId) {
         }
         
         document.getElementById('details-modal').classList.add('show');
-    } catch (error) { 
-        console.error(error); 
-    }
+    } catch (error) { console.error(error); }
 }
 
 function closeModal() { 
@@ -728,11 +708,8 @@ function closeModal() {
 }
 
 async function toggleKeep(playerId, isChecked) { 
-    try { 
-        await set(ref(db, 'scores/' + playerId + '/keep'), isChecked); 
-    } catch (e) { 
-        console.error(e); 
-    } 
+    try { await set(ref(db, 'scores/' + playerId + '/keep'), isChecked); } 
+    catch (e) { console.error(e); } 
 }
 
 async function resetPodium() {
@@ -744,9 +721,7 @@ async function resetPodium() {
                 await set(ref(db, 'scores'), null); 
                 alert("🗑️ Base de données réinitialisée !"); 
                 showPodium(); 
-            } catch (error) { 
-                alert("Erreur lors de la réinitialisation."); 
-            }
+            } catch (error) { alert("Erreur lors de la réinitialisation."); }
         }
     } else if (pwd !== null) { 
         alert("❌ Mot de passe incorrect."); 
@@ -835,12 +810,8 @@ async function downloadExcel() {
             if(dataDetails.length > 0) window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(dataDetails), "Détail Brut");
             
             window.XLSX.writeFile(wb, "Resultats_GEII.xlsx");
-        } catch (e) { 
-            alert("Erreur lors de la création du fichier Excel."); 
-        }
-    } else if (pwd !== null) { 
-        alert("❌ Mot de passe incorrect."); 
-    }
+        } catch (e) { alert("Erreur lors de la création du fichier Excel."); }
+    } else if (pwd !== null) { alert("❌ Mot de passe incorrect."); }
 }
 
 // ==========================================
@@ -850,9 +821,9 @@ function buildPDF(playerData, chartDataUrl) {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
     
-    // Fonction de finalisation du PDF (appelée quand les images sont chargées)
+    // Fonction de finalisation du PDF
     const finalize = (logoUrl, qrUrl) => {
-        // En-tête (Logo centré et Titre)
+        // En-tête (Logo et Titre)
         if(logoUrl) { 
             doc.addImage(logoUrl, 'PNG', 75, 10, 60, 18); 
         }
@@ -873,12 +844,12 @@ function buildPDF(playerData, chartDataUrl) {
         let profil = playerData.Profil || document.getElementById('best-path').innerText.replace('👉 PARCOURS CONSEILLÉ : ', '').replace(' 👈', '');
         doc.text(`Profil Recommandé : ${profil}`, 15, 66);
 
-        // Graphique Radar positionné sous l'en-tête, à droite
+        // Graphique Radar
         if(chartDataUrl) { 
             doc.addImage(chartDataUrl, 'PNG', 120, 40, 75, 75); 
         }
 
-        // Création des données pour le tableau
+        // Tableau
         let tableData = [];
         if(playerData.SessionDetails) { 
             playerData.SessionDetails.forEach(q => { 
@@ -886,9 +857,8 @@ function buildPDF(playerData, chartDataUrl) {
             }); 
         }
         
-        // Création du tableau de réponses
         doc.autoTable({
-            startY: 120, // Plus bas pour laisser respirer l'en-tête
+            startY: 120,
             head: [['Catégorie', 'Question Posée', 'Résultat', 'Bonne Réponse']],
             body: tableData,
             headStyles: { fillColor: [46, 204, 113] },
@@ -899,7 +869,7 @@ function buildPDF(playerData, chartDataUrl) {
         // --- CONCLUSION, LIEN ET QR CODE ---
         let finalY = doc.lastAutoTable.finalY + 15;
 
-        // Si on n'a plus de place en bas, on crée une nouvelle page
+        // Saut de page de sécurité si le bas est trop proche
         if (finalY > 230) { 
             doc.addPage(); 
             finalY = 20; 
@@ -913,92 +883,86 @@ function buildPDF(playerData, chartDataUrl) {
         doc.setFont("helvetica", "italic"); 
         doc.setFontSize(10); 
         doc.setTextColor(80, 80, 80);
-        
         let conclusionText = "Attention : Ce bilan est issu d'un jeu récréatif scientifique. Il ne définit en rien ton avenir scolaire ou professionnel, mais souligne tes affinités actuelles. L'important est de choisir la voie qui te passionne !";
-        
-        // Aligne le texte sur 120mm de largeur pour laisser de la place au QR Code à droite
         doc.text(conclusionText, 15, finalY + 8, { maxWidth: 120, align: 'justify' });
 
-        // Lien pour rejouer
+        // Appel à l'action
         doc.setFont("helvetica", "bold"); 
         doc.setFontSize(11); 
         doc.setTextColor(39, 174, 96);
         let rejouerText = "Envie de rejouer ou de relever le défi entre amis ?";
         doc.text(rejouerText, 15, finalY + 30);
         
-        doc.setTextColor(52, 152, 219); 
+        // Texte cliquable et souligné
+        doc.setFont("helvetica", "bold");
         doc.setFontSize(10);
-        let linkText = "Cliquez ici pour accéder au jeu : https://5urio5.github.io/Jeu_GEII/";
-        doc.text(linkText, 15, finalY + 36);
-        
-        // Zone cliquable invisible sur le lien PDF
-        doc.link(15, finalY + 32, 120, 10, { url: 'https://5urio5.github.io/Jeu_GEII/' }); 
+        doc.setTextColor(52, 152, 219); 
+        let clickText = "Clique ici";
+        doc.text(clickText, 15, finalY + 36);
 
-        // Ajout du QR Code à droite du texte
+        // Tracé du soulignement bleu
+        let textWidth = doc.getTextWidth(clickText);
+        doc.setDrawColor(52, 152, 219);
+        doc.setLineWidth(0.3);
+        doc.line(15, finalY + 37, 15 + textWidth, finalY + 37);
+
+        // La zone cliquable invisible
+        doc.link(15, finalY + 32, textWidth, 6, { url: 'https://5urio5.github.io/Jeu_GEII/' }); 
+
+        // Suite de la phrase
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(80, 80, 80);
+        let suiteText = " pour y accéder, ou scanne le code QR juste ici 👉";
+        doc.text(suiteText, 15 + textWidth + 1, finalY + 36);
+
+        // Ajout du QR Code à droite
         if(qrUrl) {
-            doc.addImage(qrUrl, 'PNG', 150, finalY + 5, 35, 35); 
+            doc.addImage(qrUrl, 'PNG', 145, finalY + 15, 35, 35); 
             doc.setFontSize(8); 
             doc.setTextColor(100, 100, 100); 
             doc.setFont("helvetica", "normal");
-            doc.text("Scannez pour jouer !", 167.5, finalY + 43, { align: "center" });
+            doc.text("Scannez pour jouer !", 162.5, finalY + 53, { align: "center" });
         }
 
-        // Sauvegarde du fichier PDF
         doc.save(`Bilan_GEII_${playerData.Candidat}.pdf`);
     };
 
-    // Chargement asynchrone du Logo et du QR Code
-    let logoLoaded = false; 
-    let logoDataUrl = null;
-    let qrLoaded = false; 
-    let qrDataUrl = null;
+    // Chargement parallèle (Logo + QR Code)
+    let logoLoaded = false; let logoDataUrl = null;
+    let qrLoaded = false; let qrDataUrl = null;
 
     const checkAllLoaded = () => { 
         if(logoLoaded && qrLoaded) finalize(logoDataUrl, qrDataUrl); 
     };
 
-    // 1. Charge le Logo noir
     const imgLogo = new Image(); 
     imgLogo.crossOrigin = "anonymous"; 
     imgLogo.src = "logo_noir.png";
     imgLogo.onload = () => {
         const canvas = document.createElement('canvas'); 
-        canvas.width = imgLogo.naturalWidth; 
-        canvas.height = imgLogo.naturalHeight;
+        canvas.width = imgLogo.naturalWidth; canvas.height = imgLogo.naturalHeight;
         canvas.getContext('2d').drawImage(imgLogo, 0, 0); 
         logoDataUrl = canvas.toDataURL('image/png');
-        logoLoaded = true; 
-        checkAllLoaded();
+        logoLoaded = true; checkAllLoaded();
     };
-    imgLogo.onerror = () => { 
-        logoLoaded = true; 
-        checkAllLoaded(); 
-    };
+    imgLogo.onerror = () => { logoLoaded = true; checkAllLoaded(); };
 
-    // 2. Charge le QR Code
     const imgQR = new Image(); 
-    imgQR.src = "qr_code.png";
+    imgQR.src = "qr_code.png"; // Nom exact requis !
     imgQR.onload = () => {
         const canvas = document.createElement('canvas'); 
-        canvas.width = imgQR.naturalWidth; 
-        canvas.height = imgQR.naturalHeight;
+        canvas.width = imgQR.naturalWidth; canvas.height = imgQR.naturalHeight;
         canvas.getContext('2d').drawImage(imgQR, 0, 0); 
         qrDataUrl = canvas.toDataURL('image/png');
-        qrLoaded = true; 
-        checkAllLoaded();
+        qrLoaded = true; checkAllLoaded();
     };
-    imgQR.onerror = () => { 
-        qrLoaded = true; 
-        checkAllLoaded(); 
-    };
+    imgQR.onerror = () => { qrLoaded = true; checkAllLoaded(); };
 }
 
 function generatePlayerPDF() {
     if(!resultsChartInstance) return alert("Graphique non disponible.");
-    
     let chartUrl = resultsChartInstance.toBase64Image();
     let pData = { Candidat: playerName, "Score Points": scoreTotal, SessionDetails: playerSessionDetails };
-    
     buildPDF(pData, chartUrl);
 }
 
@@ -1007,7 +971,6 @@ async function generateAdminPDF() {
     
     if (pwd === ADMIN_PASSWORD) {
         if(!currentViewingPlayerId || !modalChartInstance) return;
-        
         try {
             const snapshot = await get(ref(db, `scores/${currentViewingPlayerId}`));
             if (snapshot.exists()) { 
@@ -1015,13 +978,8 @@ async function generateAdminPDF() {
                 let chartUrl = modalChartInstance.toBase64Image(); 
                 buildPDF(pData, chartUrl); 
             }
-        } catch(e) { 
-            console.error(e); 
-            alert("Erreur lors de la récupération du joueur."); 
-        }
-    } else if (pwd !== null) { 
-        alert("❌ Mot de passe incorrect."); 
-    }
+        } catch(e) { console.error(e); alert("Erreur lors de la récupération du joueur."); }
+    } else if (pwd !== null) { alert("❌ Mot de passe incorrect."); }
 }
 
 // ==========================================
@@ -1033,9 +991,7 @@ async function openQuestionEditor() {
     if (pwd === ADMIN_PASSWORD) { 
         renderEditorList(); 
         document.getElementById('editor-modal').classList.add('show'); 
-    } else if (pwd !== null) { 
-        alert("❌ Mot de passe incorrect."); 
-    }
+    } else if (pwd !== null) { alert("❌ Mot de passe incorrect."); }
 }
 
 function closeEditor() { 
@@ -1063,12 +1019,8 @@ function renderEditorList() {
 
 function addNewQuestion() { 
     dynamicDB.push({ 
-        cat: "AII", 
-        diff: "Com", 
-        q: "Nouvelle Question", 
-        opt: ["Rép 1", "Rép 2", "Rép 3", "Rép 4"], 
-        ans: 0, 
-        trivia: "Le saviez-vous ?" 
+        cat: "AII", diff: "Com", q: "Nouvelle Question", 
+        opt: ["Rép 1", "Rép 2", "Rép 3", "Rép 4"], ans: 0, trivia: "Le saviez-vous ?" 
     }); 
     editQuestion(dynamicDB.length - 1); 
 }
@@ -1076,25 +1028,16 @@ function addNewQuestion() {
 async function deleteQuestion(index) { 
     if(confirm("Supprimer cette question de la base de données ?")) { 
         dynamicDB.splice(index, 1); 
-        try { 
-            await set(ref(db, 'questions'), dynamicDB); 
-            renderEditorList(); 
-        } catch(e) { 
-            alert("Erreur de sauvegarde Firebase"); 
-        } 
+        try { await set(ref(db, 'questions'), dynamicDB); renderEditorList(); } 
+        catch(e) { alert("Erreur de sauvegarde Firebase"); } 
     } 
 }
 
 async function resetQuestionsToDefault() { 
     if(confirm("⚠️ Écraser toutes les modifications et remettre la base de données d'origine ?")) { 
         dynamicDB = JSON.parse(JSON.stringify(DB)); 
-        try { 
-            await set(ref(db, 'questions'), dynamicDB); 
-            renderEditorList(); 
-            alert("Restauration réussie !"); 
-        } catch(e) { 
-            alert("Erreur de sauvegarde Firebase"); 
-        } 
+        try { await set(ref(db, 'questions'), dynamicDB); renderEditorList(); alert("Restauration réussie !"); } 
+        catch(e) { alert("Erreur de sauvegarde Firebase"); } 
     } 
 }
 
@@ -1162,9 +1105,7 @@ async function saveQuestion(index) {
         document.getElementById('editor-form-container').classList.add('hidden'); 
         renderEditorList(); 
         alert("✅ Question sauvegardée dans la base Firebase !"); 
-    } catch(e) { 
-        alert("Erreur lors de la sauvegarde Firebase."); 
-    }
+    } catch(e) { alert("Erreur lors de la sauvegarde Firebase."); }
 }
 
 // ==========================================
@@ -1202,12 +1143,8 @@ async function showScreensaver() {
             }); 
             
             scrollContent.innerHTML = html + "<br><br><br>" + html; 
-        } else { 
-            scrollContent.innerHTML = "Soyez le premier à jouer !"; 
-        } 
-    } catch (error) { 
-        scrollContent.innerHTML = "Prêt à jouer !"; 
-    }
+        } else { scrollContent.innerHTML = "Soyez le premier à jouer !"; } 
+    } catch (error) { scrollContent.innerHTML = "Prêt à jouer !"; }
 }
 
 function hideScreensaver() { 
@@ -1227,56 +1164,37 @@ document.addEventListener('keydown', function(e) {
     const editorModal = document.getElementById('editor-modal');
     const screensaver = document.getElementById('screensaver');
     
-    // Sortir de l'écran de veille dès qu'on touche le clavier
     if (!screensaver.classList.contains('hidden')) { 
-        hideScreensaver(); 
-        return; 
+        hideScreensaver(); return; 
     }
     
-    // TOUCHE ECHAP (Fermer, Annuler)
     if (e.key === 'Escape') { 
-        if (detailsModal.classList.contains('show')) { 
-            closeModal(); 
-        } else if (editorModal.classList.contains('show')) { 
-            closeEditor(); 
-        } else if (activeScreen && (activeScreen.id === 'screen-game' || activeScreen.id === 'screen-intermediate')) { 
-            cancelQuiz(); 
-        } 
+        if (detailsModal.classList.contains('show')) { closeModal(); } 
+        else if (editorModal.classList.contains('show')) { closeEditor(); } 
+        else if (activeScreen && (activeScreen.id === 'screen-game' || activeScreen.id === 'screen-intermediate')) { cancelQuiz(); } 
     }
     
-    // TOUCHE ENTRÉE (Actions contextuelles de confort)
     if (e.key === 'Enter') { 
         if (activeScreen) { 
-            if (activeScreen.id === 'screen-start' && document.activeElement.id === 'player-name') { 
-                startQuiz(); 
-            } else if (activeScreen.id === 'screen-intermediate') { 
-                goToNextQuestion(); 
-            } else if (activeScreen.id === 'screen-results') { 
-                goToStart(); 
-            } 
+            if (activeScreen.id === 'screen-start' && document.activeElement.id === 'player-name') { startQuiz(); } 
+            else if (activeScreen.id === 'screen-intermediate') { goToNextQuestion(); } 
+            else if (activeScreen.id === 'screen-results') { goToStart(); } 
         } 
     }
     
-    // FLÈCHES DU CLAVIER (Navigation dans les réponses)
     if (activeScreen && activeScreen.id === 'screen-game') {
         if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
-            e.preventDefault(); // Bloque le scrolling de la page
-            
+            e.preventDefault(); 
             const btns = Array.from(document.querySelectorAll('#answers-container .answer-btn:not(:disabled)')); 
             if (btns.length === 0) return;
             
             let currentIndex = btns.indexOf(document.activeElement);
             
             if (currentIndex === -1) { 
-                // Aucune case n'est encore sélectionnée, on encadre la première
                 btns[0].focus(); 
             } else { 
-                // Navigation circulaire entre les options
-                if (e.key === 'ArrowDown' || e.key === 'ArrowRight') { 
-                    currentIndex = (currentIndex + 1) % btns.length; 
-                } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') { 
-                    currentIndex = (currentIndex - 1 + btns.length) % btns.length; 
-                } 
+                if (e.key === 'ArrowDown' || e.key === 'ArrowRight') { currentIndex = (currentIndex + 1) % btns.length; } 
+                else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') { currentIndex = (currentIndex - 1 + btns.length) % btns.length; } 
                 btns[currentIndex].focus(); 
             }
         }
