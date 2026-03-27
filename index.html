@@ -9,7 +9,11 @@
     
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
-    <link rel="stylesheet" href="style.css?v=9">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+
+    <link rel="stylesheet" href="style.css?v=10">
 </head>
 <body>
 
@@ -19,7 +23,7 @@
         <div class="logo-container">
             <picture>
                 <source srcset="logo_blanc.png?v=9" media="(prefers-color-scheme: dark)">
-                <img src="logo_noir.png?v=9" alt="Logo GEII" onerror="this.style.display='none'; this.parentElement.innerHTML='<h2 style=\'color:#f1c40f;margin:0\'>GEII - Univ Lille</h2>';">
+                <img id="main-logo" src="logo_noir.png?v=9" alt="Logo GEII" crossorigin="anonymous">
             </picture>
         </div>
 
@@ -29,29 +33,26 @@
         <br><button class="main-btn" onclick="startQuiz()">LANCER LE JEU</button>
         <button class="secondary-btn" onclick="showPodium()">🏆 Voir le Podium</button>
         <div class="admin-tools">
-            <button class="btn-discret" onclick="downloadExcel()">[ Exporter Statistiques & Scores ]</button>
+            <button class="btn-discret" onclick="downloadExcel()">[ Exporter Statistiques ]</button>
+            <button class="btn-discret" onclick="openQuestionEditor()">[ Gérer les Questions ]</button>
         </div>
     </div>
 
     <div id="screen-game" class="container hidden slide-in-right">
         <button class="btn-cancel-quiz" onclick="cancelQuiz()" title="Annuler la partie">❌</button>
-
         <div id="header-info">
             <span id="player-display">👤 Joueur <span style="color:#f1c40f; margin-left:15px;" id="live-score">0 pts</span></span>
             <span id="timer-text">⏱️ 30s</span>
             <span style="visibility: hidden;">Fantome</span>
         </div>
         <div id="timer-container"><div id="timer-bar"></div></div>
-        <div id="question-box">
-            <div id="question-text">Question ici...</div>
-        </div>
+        <div id="question-box"><div id="question-text">Question ici...</div></div>
         <div id="answers-container"></div>
         <div id="progress-container"></div>
     </div>
 
     <div id="screen-intermediate" class="container hidden slide-in-right">
         <button class="btn-cancel-quiz" onclick="cancelQuiz()" title="Annuler la partie">❌</button>
-
         <h1 id="intermediate-title">Bonne réponse !</h1>
         <div id="intermediate-points">+ 850 pts</div>
         <div id="intermediate-streak">Série : 3 🔥</div>
@@ -66,10 +67,22 @@
 
     <div id="screen-results" class="container hidden slide-in-right">
         <h1>🎉 RÉSULTAT FINAL ! 🎉</h1>
-        <h3 id="final-score" style="color:#f1c40f; font-size: 2em; margin-bottom: 20px;">Score : 0 pts</h3>
-        <div id="scores-display" style="font-size: 1.3em; line-height: 1.8; margin-bottom: 20px; background: rgba(0,0,0,0.5); padding: 20px; border-radius: 15px;"></div>
-        <h2 id="best-path" style="color: #2ecc71; font-size: 2em; font-weight: bold; background: white; padding: 15px; border-radius: 10px; display: inline-block;"></h2>
-        <br><br><button class="main-btn" onclick="goToStart()">MENU PRINCIPAL</button>
+        <h3 id="final-score" style="color:#f1c40f; font-size: 2em; margin-bottom: 10px;">Score : 0 pts</h3>
+        
+        <div class="results-layout">
+            <div class="results-stats">
+                <div id="scores-display" style="font-size: 1.2em; line-height: 1.5; margin-bottom: 20px; background: rgba(0,0,0,0.5); padding: 15px; border-radius: 15px;"></div>
+                <h2 id="best-path" style="color: #2ecc71; font-size: 1.5em; font-weight: bold; background: white; padding: 10px; border-radius: 10px;"></h2>
+            </div>
+            <div class="results-chart-container">
+                <canvas id="results-chart"></canvas>
+            </div>
+        </div>
+
+        <div style="display: flex; justify-content: center; gap: 15px; flex-wrap: wrap; margin-top: 20px;">
+            <button class="secondary-btn" style="background-color: #e67e22;" onclick="generatePlayerPDF()">📄 Télécharger mon Bilan (PDF)</button>
+            <button class="main-btn" style="margin: 10px 0; width: auto;" onclick="goToStart()">MENU PRINCIPAL</button>
+        </div>
     </div>
 
     <div id="screen-podium" class="container hidden slide-in-right">
@@ -88,10 +101,39 @@
         <div class="modal-content">
             <span class="close-btn" onclick="closeModal()">&times;</span>
             <div id="modal-header-content"></div>
+            
+            <div class="details-layout">
+                <div class="details-chart-container">
+                    <canvas id="modal-chart"></canvas>
+                </div>
+                <div style="text-align: right;">
+                    <button class="secondary-btn" style="background-color: #e67e22;" onclick="generateAdminPDF()">📄 Exporter ce joueur en PDF</button>
+                </div>
+            </div>
+
             <table class="stat-table">
-                <thead><tr><th>Cat.</th><th>Question</th><th>Résultat</th><th>Temps</th><th>Points</th><th>Réussite Globale</th></tr></thead>
+                <thead><tr><th>Cat.</th><th>Diff.</th><th>Question</th><th>Résultat</th><th>Points</th><th>Réussite Globale</th></tr></thead>
                 <tbody id="modal-table-body"></tbody>
             </table>
+        </div>
+    </div>
+
+    <div id="editor-modal">
+        <div class="modal-content" style="max-width: 1000px;">
+            <span class="close-btn" onclick="closeEditor()">&times;</span>
+            <h2 style="color:#f1c40f; margin-top:0;">Gérer les Questions (Base de données)</h2>
+            <div style="margin-bottom: 15px;">
+                <button class="secondary-btn" style="background-color: #2ecc71;" onclick="addNewQuestion()">+ Ajouter une question</button>
+                <button class="secondary-btn" style="background-color: #e74c3c;" onclick="resetQuestionsToDefault()">⚠️ Restaurer questions par défaut</button>
+            </div>
+            <div id="editor-form-container" class="hidden" style="background: rgba(0,0,0,0.4); padding: 15px; border-radius: 10px; margin-bottom: 20px;">
+                </div>
+            <div style="max-height: 50vh; overflow-y: auto;">
+                <table class="stat-table">
+                    <thead><tr><th>ID</th><th>Cat.</th><th>Diff.</th><th>Question</th><th>Action</th></tr></thead>
+                    <tbody id="editor-table-body"></tbody>
+                </table>
+            </div>
         </div>
     </div>
 
@@ -123,6 +165,6 @@
     </div>
 
     <script src="questions.js"></script>
-    <script type="module" src="script.js?v=9"></script>
+    <script type="module" src="script.js?v=10"></script>
 </body>
 </html>
