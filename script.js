@@ -1,4 +1,4 @@
-/* global DB, confetti, XLSX, Chart, jspdf, ChartDataLabels */
+/* global DB, confetti, XLSX, Chart, jspdf */
 
 // ==========================================
 // 🔒 SÉCURITÉ : MOT DE PASSE ADMINISTRATEUR
@@ -71,12 +71,15 @@ let timerInterval;
 let idleTimer; 
 const IDLE_TIME = 120000; 
 
+// Base de données dynamique
 let dynamicDB = [];
+
+// Graphiques Chart.js instanciés
 let resultsChartInstance = null;
 let modalChartInstance = null;
 let currentViewingPlayerId = null; 
 
-// Poids des difficultés pour la justesse du Radar Chart
+// Poids des difficultés (Crucial pour la justesse du Radar Chart)
 const diffWeights = { "Com": 1, "STI": 2, "BU1": 3, "BU2": 4 };
 
 // Chargement des questions depuis Firebase
@@ -277,7 +280,6 @@ async function startQuiz() {
     if (!audioCtx) audioCtx = new AudioContextClass(); 
     if (audioCtx.state === 'suspended') audioCtx.resume();
 
-    // Vérification de sécurité anti-doublon
     try {
         const snapshot = await get(ref(db, 'scores'));
         if (snapshot.exists()) {
@@ -288,9 +290,7 @@ async function startQuiz() {
                 }
             }
         }
-    } catch(e) { 
-        console.error(e); 
-    }
+    } catch(e) { console.error(e); }
 
     playerName = safeName; 
     scoresPoints = {AII: 0, EME: 0, ESE: 0}; 
@@ -300,7 +300,6 @@ async function startQuiz() {
     currentQIndex = 0; 
     playerSessionDetails = [];
     
-    // Mixage des questions
     let selected = [];
     ['AII', 'EME', 'ESE'].forEach(cat => {
         let catQ = dynamicDB.filter(q => q.cat === cat);
@@ -413,10 +412,7 @@ function processAnswer(selectedIndex, correctIndex, clickedBtn) {
     });
 
     document.getElementById('live-score').innerText = `${scoreTotal} pts`;
-    
-    setTimeout(() => { 
-        showIntermediateScreen(isCorrect, pointsGained, qData.trivia, isTimeout); 
-    }, 1500);
+    setTimeout(() => { showIntermediateScreen(isCorrect, pointsGained, qData.trivia, isTimeout); }, 1500);
 }
 
 function showIntermediateScreen(isCorrect, points, trivia, isTimeout) {
@@ -476,6 +472,7 @@ function goToNextQuestion() {
 // RÉSULTATS ET GRAPHIQUES RADAR
 // ==========================================
 
+// Plugin Chart.js : Peint le fond du graphique en bleu pour le PDF
 const customCanvasBackgroundColor = {
     id: 'customCanvasBackgroundColor',
     beforeDraw: (chart, args, options) => {
@@ -513,10 +510,17 @@ function drawRadarChart(canvasId, dataArray, chartInstanceToUpdate) {
         chartInstanceToUpdate.destroy(); 
     }
     
+    // FUSION de la catégorie et du pourcentage pour éviter toute collision !
+    const customLabels = [
+        `AII : ${dataArray[0]}%`,
+        `EME : ${dataArray[1]}%`,
+        `ESE : ${dataArray[2]}%`
+    ];
+    
     return new Chart(ctx, {
         type: 'radar',
         data: {
-            labels: ['AII', 'EME', 'ESE'],
+            labels: customLabels,
             datasets: [{
                 label: 'Affinité (%)', 
                 data: dataArray,
@@ -529,12 +533,10 @@ function drawRadarChart(canvasId, dataArray, chartInstanceToUpdate) {
                 borderWidth: 2
             }]
         },
-        plugins: [customCanvasBackgroundColor, window.ChartDataLabels], 
+        plugins: [customCanvasBackgroundColor], 
         options: {
             animation: false,
-            layout: {
-                padding: 20 // Empêche les pourcentages de toucher les bords
-            },
+            layout: { padding: 15 },
             scales: {
                 r: { 
                     angleLines: { color: 'rgba(255, 255, 255, 0.2)' }, 
@@ -545,20 +547,7 @@ function drawRadarChart(canvasId, dataArray, chartInstanceToUpdate) {
             },
             plugins: { 
                 legend: { display: false },
-                customCanvasBackgroundColor: { color: '#1c2541' },
-                // Configuration des badges de pourcentages centrés sur les points
-                datalabels: {
-                    color: '#1c2541',
-                    backgroundColor: '#f1c40f',
-                    borderRadius: 4,
-                    padding: { top: 2, bottom: 2, left: 6, right: 6 },
-                    font: { weight: 'bold', size: 13 },
-                    formatter: function(value) {
-                        return value + '%';
-                    },
-                    anchor: 'center',
-                    align: 'center'
-                }
+                customCanvasBackgroundColor: { color: '#1c2541' } 
             }
         }
     });
@@ -604,9 +593,7 @@ async function showResults() {
                 } 
             }
         }
-    } catch(e) { 
-        console.error("Erreur classement", e); 
-    }
+    } catch(e) { console.error("Erreur classement", e); }
 
     let playerEmail = "";
     if (rank <= 3) {
@@ -736,11 +723,8 @@ function closeModal() {
 }
 
 async function toggleKeep(playerId, isChecked) { 
-    try { 
-        await set(ref(db, 'scores/' + playerId + '/keep'), isChecked); 
-    } catch (e) { 
-        console.error(e); 
-    } 
+    try { await set(ref(db, 'scores/' + playerId + '/keep'), isChecked); } 
+    catch (e) { console.error(e); } 
 }
 
 async function resetPodium() {
@@ -752,9 +736,7 @@ async function resetPodium() {
                 await set(ref(db, 'scores'), null); 
                 alert("🗑️ Base de données réinitialisée !"); 
                 showPodium(); 
-            } catch (error) { 
-                alert("Erreur lors de la réinitialisation."); 
-            }
+            } catch (error) { alert("Erreur lors de la réinitialisation."); }
         }
     } else if (pwd !== null) { 
         alert("❌ Mot de passe incorrect."); 
@@ -852,16 +834,21 @@ async function downloadExcel() {
 }
 
 // ==========================================
-// EXPORT PDF (Bilan avec Conclusion + QR Code)
+// EXPORT PDF (Bilan parfait avec Logo non écrasé)
 // ==========================================
 function buildPDF(playerData, chartDataUrl) {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
     
+    // Variables globales du logo calculées dynamiquement pour conserver le ratio
+    let logoW = 60;
+    let logoH = 18;
+    
     const finalize = (logoUrl, qrUrl) => {
-        // En-tête (Logo centré et Titre)
+        // En-tête (Logo calculé pour ne pas s'écraser)
         if(logoUrl) { 
-            doc.addImage(logoUrl, 'PNG', 75, 10, 60, 18); 
+            let logoX = 105 - (logoW / 2); // Centrage parfait sur une feuille A4
+            doc.addImage(logoUrl, 'PNG', logoX, 10, logoW, logoH); 
         }
         
         doc.setFont("helvetica", "bold"); 
@@ -905,8 +892,8 @@ function buildPDF(playerData, chartDataUrl) {
         // --- CONCLUSION, LIEN ET QR CODE ---
         let finalY = doc.lastAutoTable.finalY + 15;
 
-        // Saut de page de sécurité si le bas est trop proche
-        if (finalY > 230) { 
+        // Saut de page de sécurité
+        if (finalY > 220) { 
             doc.addPage(); 
             finalY = 20; 
         }
@@ -920,44 +907,44 @@ function buildPDF(playerData, chartDataUrl) {
         doc.setFontSize(10); 
         doc.setTextColor(80, 80, 80);
         let conclusionText = "Attention : Ce bilan est issu d'un jeu récréatif scientifique. Il ne définit en rien ton avenir scolaire ou professionnel, mais souligne tes affinités actuelles. L'important est de choisir la voie qui te passionne !";
-        doc.text(conclusionText, 15, finalY + 8, { maxWidth: 120, align: 'justify' });
+        doc.text(conclusionText, 15, finalY + 8, { maxWidth: 125, align: 'justify' });
 
         // Appel à l'action
         doc.setFont("helvetica", "bold"); 
         doc.setFontSize(11); 
         doc.setTextColor(39, 174, 96);
         let rejouerText = "Envie de rejouer ou de relever le défi entre amis ?";
-        doc.text(rejouerText, 15, finalY + 30);
+        doc.text(rejouerText, 15, finalY + 28);
         
         // Texte cliquable et souligné "Clique ici"
         doc.setFont("helvetica", "bold");
         doc.setFontSize(10);
         doc.setTextColor(52, 152, 219); 
         let clickText = "Clique ici";
-        doc.text(clickText, 15, finalY + 36);
+        doc.text(clickText, 15, finalY + 34);
 
         // Tracé du soulignement bleu
         let textWidth = doc.getTextWidth(clickText);
         doc.setDrawColor(52, 152, 219);
         doc.setLineWidth(0.3);
-        doc.line(15, finalY + 37, 15 + textWidth, finalY + 37);
+        doc.line(15, finalY + 35, 15 + textWidth, finalY + 35);
 
         // La zone cliquable invisible
-        doc.link(15, finalY + 32, textWidth, 6, { url: 'https://5urio5.github.io/Jeu_GEII/' }); 
+        doc.link(15, finalY + 30, textWidth, 6, { url: 'https://5urio5.github.io/Jeu_GEII/' }); 
 
         // Suite de la phrase modifiée
         doc.setFont("helvetica", "normal");
         doc.setTextColor(80, 80, 80);
         let suiteText = " pour y accéder, ou scanne le code QR juste ici 👉";
-        doc.text(suiteText, 15 + textWidth + 1, finalY + 36);
+        doc.text(suiteText, 15 + textWidth + 1, finalY + 34);
 
-        // Ajout du QR Code à droite
+        // Ajout du QR Code à droite en toute sécurité (sans superposition)
         if(qrUrl) {
-            doc.addImage(qrUrl, 'PNG', 145, finalY + 15, 35, 35); 
+            doc.addImage(qrUrl, 'PNG', 155, finalY + 5, 35, 35); 
             doc.setFontSize(8); 
             doc.setTextColor(100, 100, 100); 
             doc.setFont("helvetica", "normal");
-            doc.text("Scannez pour jouer !", 162.5, finalY + 53, { align: "center" });
+            doc.text("Scannez pour jouer !", 172.5, finalY + 43, { align: "center" });
         }
 
         doc.save(`Bilan_GEII_${playerData.Candidat}.pdf`);
@@ -980,6 +967,12 @@ function buildPDF(playerData, chartDataUrl) {
         canvas.height = imgLogo.naturalHeight;
         canvas.getContext('2d').drawImage(imgLogo, 0, 0); 
         logoDataUrl = canvas.toDataURL('image/png');
+        
+        // Calcul exact du ratio du logo
+        let ratio = imgLogo.naturalWidth / imgLogo.naturalHeight;
+        logoH = 18;
+        logoW = 18 * ratio;
+        
         logoLoaded = true; 
         checkAllLoaded();
     };
