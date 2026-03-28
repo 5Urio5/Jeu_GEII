@@ -1,4 +1,4 @@
-/* global DB, confetti, XLSX, Chart, jspdf */
+/* global DB, confetti, XLSX, Chart, jspdf, ChartDataLabels */
 
 // ==========================================
 // 🔒 SÉCURITÉ : MOT DE PASSE ADMINISTRATEUR
@@ -471,8 +471,6 @@ function goToNextQuestion() {
 // ==========================================
 // RÉSULTATS ET GRAPHIQUES RADAR
 // ==========================================
-
-// Plugin Chart.js : Peint le fond du graphique en bleu pour le PDF
 const customCanvasBackgroundColor = {
     id: 'customCanvasBackgroundColor',
     beforeDraw: (chart, args, options) => {
@@ -510,17 +508,10 @@ function drawRadarChart(canvasId, dataArray, chartInstanceToUpdate) {
         chartInstanceToUpdate.destroy(); 
     }
     
-    // FUSION de la catégorie et du pourcentage pour éviter toute collision !
-    const customLabels = [
-        `AII : ${dataArray[0]}%`,
-        `EME : ${dataArray[1]}%`,
-        `ESE : ${dataArray[2]}%`
-    ];
-    
     return new Chart(ctx, {
         type: 'radar',
         data: {
-            labels: customLabels,
+            labels: ['AII', 'EME', 'ESE'],
             datasets: [{
                 label: 'Affinité (%)', 
                 data: dataArray,
@@ -533,10 +524,10 @@ function drawRadarChart(canvasId, dataArray, chartInstanceToUpdate) {
                 borderWidth: 2
             }]
         },
-        plugins: [customCanvasBackgroundColor], 
+        plugins: [customCanvasBackgroundColor, window.ChartDataLabels], 
         options: {
             animation: false,
-            layout: { padding: 15 },
+            layout: { padding: 20 },
             scales: {
                 r: { 
                     angleLines: { color: 'rgba(255, 255, 255, 0.2)' }, 
@@ -547,7 +538,17 @@ function drawRadarChart(canvasId, dataArray, chartInstanceToUpdate) {
             },
             plugins: { 
                 legend: { display: false },
-                customCanvasBackgroundColor: { color: '#1c2541' } 
+                customCanvasBackgroundColor: { color: '#1c2541' },
+                datalabels: {
+                    color: '#1c2541',
+                    backgroundColor: '#f1c40f',
+                    borderRadius: 4,
+                    padding: { top: 2, bottom: 2, left: 6, right: 6 },
+                    font: { weight: 'bold', size: 13 },
+                    formatter: function(value) { return value + '%'; },
+                    anchor: 'center',
+                    align: 'center'
+                }
             }
         }
     });
@@ -834,20 +835,19 @@ async function downloadExcel() {
 }
 
 // ==========================================
-// EXPORT PDF (Bilan parfait avec Logo non écrasé)
+// EXPORT PDF AVEC CONCLUSION ET QR CODE
 // ==========================================
 function buildPDF(playerData, chartDataUrl) {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
     
-    // Variables globales du logo calculées dynamiquement pour conserver le ratio
     let logoW = 60;
     let logoH = 18;
     
     const finalize = (logoUrl, qrUrl) => {
-        // En-tête (Logo calculé pour ne pas s'écraser)
+        // En-tête 
         if(logoUrl) { 
-            let logoX = 105 - (logoW / 2); // Centrage parfait sur une feuille A4
+            let logoX = 105 - (logoW / 2); 
             doc.addImage(logoUrl, 'PNG', logoX, 10, logoW, logoH); 
         }
         
@@ -889,10 +889,9 @@ function buildPDF(playerData, chartDataUrl) {
             columnStyles: { 0: { cellWidth: 20 }, 1: { cellWidth: 90 }, 2: { cellWidth: 20 }, 3: { cellWidth: 50 } }
         });
 
-        // --- CONCLUSION, LIEN ET QR CODE ---
+        // --- CONCLUSION, LIEN ET QR CODE SANS EMOJI ---
         let finalY = doc.lastAutoTable.finalY + 15;
 
-        // Saut de page de sécurité
         if (finalY > 220) { 
             doc.addPage(); 
             finalY = 20; 
@@ -909,36 +908,33 @@ function buildPDF(playerData, chartDataUrl) {
         let conclusionText = "Attention : Ce bilan est issu d'un jeu récréatif scientifique. Il ne définit en rien ton avenir scolaire ou professionnel, mais souligne tes affinités actuelles. L'important est de choisir la voie qui te passionne !";
         doc.text(conclusionText, 15, finalY + 8, { maxWidth: 125, align: 'justify' });
 
-        // Appel à l'action
         doc.setFont("helvetica", "bold"); 
         doc.setFontSize(11); 
         doc.setTextColor(39, 174, 96);
         let rejouerText = "Envie de rejouer ou de relever le défi entre amis ?";
         doc.text(rejouerText, 15, finalY + 28);
         
-        // Texte cliquable et souligné "Clique ici"
         doc.setFont("helvetica", "bold");
         doc.setFontSize(10);
         doc.setTextColor(52, 152, 219); 
         let clickText = "Clique ici";
         doc.text(clickText, 15, finalY + 34);
 
-        // Tracé du soulignement bleu
         let textWidth = doc.getTextWidth(clickText);
         doc.setDrawColor(52, 152, 219);
         doc.setLineWidth(0.3);
         doc.line(15, finalY + 35, 15 + textWidth, finalY + 35);
 
-        // La zone cliquable invisible
         doc.link(15, finalY + 30, textWidth, 6, { url: 'https://5urio5.github.io/Jeu_GEII/' }); 
 
-        // Suite de la phrase modifiée
         doc.setFont("helvetica", "normal");
         doc.setTextColor(80, 80, 80);
-        let suiteText = " pour y accéder, ou scanne le code QR juste ici 👉";
+        
+        // Texte final corrigé SANS EMOJI pour le PDF
+        let suiteText = " pour y accéder, ou scanne le code QR";
         doc.text(suiteText, 15 + textWidth + 1, finalY + 34);
 
-        // Ajout du QR Code à droite en toute sécurité (sans superposition)
+        // QR Code
         if(qrUrl) {
             doc.addImage(qrUrl, 'PNG', 155, finalY + 5, 35, 35); 
             doc.setFontSize(8); 
@@ -950,7 +946,6 @@ function buildPDF(playerData, chartDataUrl) {
         doc.save(`Bilan_GEII_${playerData.Candidat}.pdf`);
     };
 
-    // Chargement asynchrone du Logo et du QR Code
     let logoLoaded = false; let logoDataUrl = null;
     let qrLoaded = false; let qrDataUrl = null;
 
@@ -968,7 +963,6 @@ function buildPDF(playerData, chartDataUrl) {
         canvas.getContext('2d').drawImage(imgLogo, 0, 0); 
         logoDataUrl = canvas.toDataURL('image/png');
         
-        // Calcul exact du ratio du logo
         let ratio = imgLogo.naturalWidth / imgLogo.naturalHeight;
         logoH = 18;
         logoW = 18 * ratio;
