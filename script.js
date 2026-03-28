@@ -71,15 +71,12 @@ let timerInterval;
 let idleTimer; 
 const IDLE_TIME = 120000; 
 
-// Base de données dynamique
 let dynamicDB = [];
-
-// Graphiques Chart.js instanciés
 let resultsChartInstance = null;
 let modalChartInstance = null;
 let currentViewingPlayerId = null; 
 
-// Poids des difficultés (Crucial pour la justesse du Radar Chart)
+// Poids des difficultés pour la justesse du Radar Chart
 const diffWeights = { "Com": 1, "STI": 2, "BU1": 3, "BU2": 4 };
 
 // Chargement des questions depuis Firebase
@@ -100,7 +97,7 @@ async function loadQuestionsFromFirebase() {
 loadQuestionsFromFirebase();
 
 // ==========================================
-// 🛡️ MODALE DU MOT DE PASSE (PROMESSE)
+// 🛡️ MODALE DU MOT DE PASSE
 // ==========================================
 function askPassword() {
     return new Promise((resolve) => {
@@ -280,7 +277,7 @@ async function startQuiz() {
     if (!audioCtx) audioCtx = new AudioContextClass(); 
     if (audioCtx.state === 'suspended') audioCtx.resume();
 
-    // Vérification de sécurité anti-doublon dans Firebase
+    // Vérification de sécurité anti-doublon
     try {
         const snapshot = await get(ref(db, 'scores'));
         if (snapshot.exists()) {
@@ -303,7 +300,7 @@ async function startQuiz() {
     currentQIndex = 0; 
     playerSessionDetails = [];
     
-    // Mixage des questions depuis la base de données dynamique
+    // Mixage des questions
     let selected = [];
     ['AII', 'EME', 'ESE'].forEach(cat => {
         let catQ = dynamicDB.filter(q => q.cat === cat);
@@ -315,7 +312,6 @@ async function startQuiz() {
     });
     currentQuestions = selected.sort(() => 0.5 - Math.random());
     
-    // Génération de la barre de progression
     let progContainer = document.getElementById('progress-container'); 
     progContainer.innerHTML = '';
     
@@ -323,7 +319,7 @@ async function startQuiz() {
         progContainer.innerHTML += `<div class="progress-box" id="box-${i}"></div>`; 
     }
     
-    document.getElementById('player-display').innerHTML = `👤 ${playerName} <span style="margin-left:20px; color:#f1c40f;" id="live-score">0 pts</span>`;
+    document.getElementById('player-display').innerHTML = `👤 ${playerName} <span style="color:#f1c40f; margin-left:15px;" id="live-score">0 pts</span>`;
     slideTo('screen-game'); 
     loadQuestion();
 }
@@ -480,7 +476,6 @@ function goToNextQuestion() {
 // RÉSULTATS ET GRAPHIQUES RADAR
 // ==========================================
 
-// Le "Plugin" de Chart.js qui peint le fond en bleu nuit lors de la création du PDF !
 const customCanvasBackgroundColor = {
     id: 'customCanvasBackgroundColor',
     beforeDraw: (chart, args, options) => {
@@ -534,12 +529,11 @@ function drawRadarChart(canvasId, dataArray, chartInstanceToUpdate) {
                 borderWidth: 2
             }]
         },
-        // Ajout du plugin officiel Datalabels + notre fond personnalisé
         plugins: [customCanvasBackgroundColor, window.ChartDataLabels], 
         options: {
             animation: false,
             layout: {
-                padding: 15 // Laisse de la place pour que les % ne soient pas coupés
+                padding: 20 // Empêche les pourcentages de toucher les bords
             },
             scales: {
                 r: { 
@@ -552,14 +546,18 @@ function drawRadarChart(canvasId, dataArray, chartInstanceToUpdate) {
             plugins: { 
                 legend: { display: false },
                 customCanvasBackgroundColor: { color: '#1c2541' },
-                datalabels: { // Configuration pour afficher les pourcentages en permanence
-                    color: '#f1c40f',
-                    font: { weight: 'bold', size: 14 },
+                // Configuration des badges de pourcentages centrés sur les points
+                datalabels: {
+                    color: '#1c2541',
+                    backgroundColor: '#f1c40f',
+                    borderRadius: 4,
+                    padding: { top: 2, bottom: 2, left: 6, right: 6 },
+                    font: { weight: 'bold', size: 13 },
                     formatter: function(value) {
                         return value + '%';
                     },
-                    align: 'end',
-                    anchor: 'end'
+                    anchor: 'center',
+                    align: 'center'
                 }
             }
         }
@@ -854,14 +852,14 @@ async function downloadExcel() {
 }
 
 // ==========================================
-// EXPORT PDF AVEC CONCLUSION ET QR CODE
+// EXPORT PDF (Bilan avec Conclusion + QR Code)
 // ==========================================
 function buildPDF(playerData, chartDataUrl) {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
     
     const finalize = (logoUrl, qrUrl) => {
-        // En-tête (Logo et Titre)
+        // En-tête (Logo centré et Titre)
         if(logoUrl) { 
             doc.addImage(logoUrl, 'PNG', 75, 10, 60, 18); 
         }
@@ -907,6 +905,7 @@ function buildPDF(playerData, chartDataUrl) {
         // --- CONCLUSION, LIEN ET QR CODE ---
         let finalY = doc.lastAutoTable.finalY + 15;
 
+        // Saut de page de sécurité si le bas est trop proche
         if (finalY > 230) { 
             doc.addPage(); 
             finalY = 20; 
@@ -965,10 +964,8 @@ function buildPDF(playerData, chartDataUrl) {
     };
 
     // Chargement asynchrone du Logo et du QR Code
-    let logoLoaded = false; 
-    let logoDataUrl = null;
-    let qrLoaded = false; 
-    let qrDataUrl = null;
+    let logoLoaded = false; let logoDataUrl = null;
+    let qrLoaded = false; let qrDataUrl = null;
 
     const checkAllLoaded = () => { 
         if(logoLoaded && qrLoaded) finalize(logoDataUrl, qrDataUrl); 
@@ -986,10 +983,7 @@ function buildPDF(playerData, chartDataUrl) {
         logoLoaded = true; 
         checkAllLoaded();
     };
-    imgLogo.onerror = () => { 
-        logoLoaded = true; 
-        checkAllLoaded(); 
-    };
+    imgLogo.onerror = () => { logoLoaded = true; checkAllLoaded(); };
 
     const imgQR = new Image(); 
     imgQR.src = "qr_code.png"; 
@@ -1002,10 +996,7 @@ function buildPDF(playerData, chartDataUrl) {
         qrLoaded = true; 
         checkAllLoaded();
     };
-    imgQR.onerror = () => { 
-        qrLoaded = true; 
-        checkAllLoaded(); 
-    };
+    imgQR.onerror = () => { qrLoaded = true; checkAllLoaded(); };
 }
 
 function generatePlayerPDF() {
