@@ -78,7 +78,7 @@ button { font-family: inherit; outline: none; }
 #player-display { text-align: left; }
 #timer-text { text-align: center; }
 
-/* Règle vitale pour empêcher le "pts" de passer à la ligne seul */
+/* Règle vitale pour empêcher le "pts" de passer à la ligne seul sur mobile */
 #live-score { white-space: nowrap; }
 
 #timer-container { width: 100%; height: 15px; background-color: rgba(255,255,255,0.2); border-radius: 10px; overflow: hidden; margin-bottom: 25px; box-shadow: inset 0 2px 5px rgba(0,0,0,0.3); }
@@ -172,14 +172,14 @@ th, td { padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.2); vert
    ADAPTATION MOBILE & RESPONSIVE
    ========================================== */
 @media (max-width: 768px) {
-    /* Repousse le contenu sous les boutons absolus pour éviter les superpositions */
+    /* Repousse le contenu sous les boutons absolus */
     .container { padding-top: 60px; padding-left: 15px; padding-right: 15px; }
     #btn-manual-screensaver, .btn-cancel-quiz { top: 15px; right: 15px; font-size: 1.6em; }
     
     .logo-container { margin-top: 0; padding: 10px 20px; }
     h1 { font-size: 2.2em; }
 
-    /* Correction En-tête : Force le score sur la même ligne que "pts", sous le pseudo */
+    /* Correction En-tête : Force le score sous le pseudo, et empeche "pts" de se couper */
     #player-display {
         display: flex;
         flex-direction: column;
