@@ -1,9 +1,25 @@
 /* global DB, confetti, XLSX, Chart, jspdf */
 
 // ==========================================
-// 🔒 SÉCURITÉ : MOT DE PASSE ADMINISTRATEUR
+// 🔒 SÉCURITÉ ET CONFIGURATION (MODIFIABLES)
 // ==========================================
 const ADMIN_PASSWORD = "iutgeii";
+
+// Coefficients de difficulté appliqués aux points
+const DIFF_WEIGHTS = { 
+    "Com": 0.75, 
+    "STI": 1, 
+    "BU1": 1.25, 
+    "BU2": 1.5 
+};
+
+// Traduction visuelle des catégories pour les joueurs (Pastilles & Excel)
+const DIFF_LABELS = { 
+    "Com": "CG", 
+    "STI": "STI2D", 
+    "BU1": "BUT1", 
+    "BU2": "BUT2" 
+};
 
 // ==========================================
 // FIREBASE - CONNEXION BASE DE DONNÉES TEMPS RÉEL
@@ -78,10 +94,6 @@ let resultsChartInstance = null;
 let modalChartInstance = null;
 let currentViewingPlayerId = null; 
 
-// 🔥 NOUVEAUX COEFFICIENTS DE DIFFICULTÉ 🔥
-const diffWeights = { "Com": 0.5, "STI": 1, "BU1": 1.5, "BU2": 2 };
-
-// Chargement des questions depuis Firebase
 async function loadQuestionsFromFirebase() {
     try {
         const snap = await get(ref(db, 'questions'));
@@ -367,14 +379,16 @@ function loadQuestion() {
     let qData = currentQuestions[currentQIndex];
     let diffClass = "diff-" + qData.diff;
     
-    // NOUVEAU : Affichage de la pastille de couleur à côté de la question
+    // Application de la traduction (ex: "Com" -> "CG")
+    let displayDiff = DIFF_LABELS[qData.diff] || qData.diff;
+    
     let qBox = document.getElementById('question-text');
     qBox.innerHTML = ''; 
     qBox.appendChild(document.createTextNode(`Q${currentQIndex + 1}/${totalQuestions} `));
     
     let badge = document.createElement('span');
     badge.className = `diff-badge ${diffClass}`;
-    badge.innerText = qData.diff;
+    badge.innerText = displayDiff; // Affichage du nouveau label
     qBox.appendChild(badge);
     
     qBox.appendChild(document.createTextNode(` : `));
@@ -434,9 +448,9 @@ function processAnswer(selectedIndex, correctIndex, clickedBtn) {
         if(clickedBtn) clickedBtn.classList.add('btn-correct'); 
         box.classList.add('prog-correct');
         
-        // 🔥 NOUVEAU CALCUL : Les points dépendent du temps ET de la difficulté !
+        // Calcul des points basé sur le nouveau système de variables
         let basePoints = Math.round((timeLeft / timeLimit) * 500) + 500;
-        let coef = diffWeights[qData.diff] || 1;
+        let coef = DIFF_WEIGHTS[qData.diff] || 1;
         pointsGained = Math.round(basePoints * coef);
         
         scoreTotal += pointsGained; 
@@ -462,7 +476,10 @@ function processAnswer(selectedIndex, correctIndex, clickedBtn) {
     });
 
     document.getElementById('live-score').innerText = `${scoreTotal} pts`;
-    setTimeout(() => { showIntermediateScreen(isCorrect, pointsGained, qData.trivia, isTimeout); }, 1500);
+    
+    setTimeout(() => { 
+        showIntermediateScreen(isCorrect, pointsGained, qData.trivia, isTimeout); 
+    }, 1500);
 }
 
 function showIntermediateScreen(isCorrect, points, trivia, isTimeout) {
@@ -500,7 +517,7 @@ function showIntermediateScreen(isCorrect, points, trivia, isTimeout) {
     
     document.getElementById('trivia-text').innerText = trivia; 
     
-    // NOUVEAU : Changement du bouton si c'est la toute dernière question
+    // Changement du bouton si c'est la toute dernière question
     let nextBtn = document.getElementById('next-question-btn');
     if (currentQIndex === totalQuestions - 1) {
         nextBtn.innerText = "Voir mon résultat ➡️";
@@ -542,13 +559,12 @@ const customCanvasBackgroundColor = {
     }
 };
 
-// 🔥 NOUVEAU CALCUL RADAR : Basé sur le ratio (Points gagnés / Points Maximum possibles) 🔥
 function calculateRadarData(sessionDetails) {
     let stats = { AII: {maxPts:0, valPts:0}, EME: {maxPts:0, valPts:0}, ESE: {maxPts:0, valPts:0} };
     
     sessionDetails.forEach(q => {
-        let w = diffWeights[q.diff] || 1; 
-        let maxQPoints = 1000 * w; // Maximum possible : 1000 points de base * coefficient
+        let w = DIFF_WEIGHTS[q.diff] || 1; 
+        let maxQPoints = 1000 * w; // Le max théorique est toujours de 1000 * coeff
         
         if(stats[q.cat]) {
             stats[q.cat].maxPts += maxQPoints;
@@ -623,7 +639,7 @@ async function showResults() {
     
     let htmlScores = ""; 
     let bestCat = ""; 
-    let maxScorePts = -1; // 🔥 NOUVEAU : On départage sur le total des POINTS, plus d'égalités !
+    let maxScorePts = -1; 
     
     for (let cat of ["AII", "EME", "ESE"]) {
         let count = scoresCount[cat]; 
@@ -782,8 +798,9 @@ async function openModal(playerId) {
                 let resIcon = q.isCorrect ? `<span class="correct-cell">✅</span>` : `<span class="incorrect-cell">❌</span>`;
                 let successRate = (globalStats[q.q] && globalStats[q.q].asked > 0) ? Math.round((globalStats[q.q].correct / globalStats[q.q].asked) * 100) + "%" : "-";
                 
-                // 🔥 NOUVEAU : PASTILLE DE DIFFICULTÉ DANS LE TABLEAU 🔥
-                let badgeHtml = `<span class="diff-badge diff-${q.diff || 'Com'}">${q.diff || '-'}</span>`;
+                // Intégration de la pastille de couleur traduite dans l'onglet détail
+                let displayDiff = DIFF_LABELS[q.diff] || q.diff || '-';
+                let badgeHtml = `<span class="diff-badge diff-${q.diff || 'Com'}">${displayDiff}</span>`;
                 
                 tbody.innerHTML += `<tr>
                     <td style="text-align:center;">${q.cat}</td>
@@ -880,7 +897,7 @@ async function downloadExcel() {
                             "Candidat": p.Candidat, 
                             "Num": index + 1, 
                             "Catégorie": q.cat, 
-                            "Diff": q.diff || '-', 
+                            "Diff": DIFF_LABELS[q.diff] || q.diff || '-', // Traduction dans le fichier Excel
                             "Question": q.q, 
                             "Résultat": q.isCorrect ? "VRAI" : "FAUX", 
                             "Temps (s)": q.time, 
@@ -1176,6 +1193,8 @@ async function resetQuestionsToDefault() {
 
 function editQuestion(index) {
     let q = dynamicDB[index];
+    
+    // Le menu déroulant affiche les nouveaux labels visuels, mais enregistre la valeur DB
     let formHtml = `
         <h3 style="margin-top:0; color:#2ecc71;">Modification (ID: ${index})</h3>
         <select id="edit-cat" class="editor-select">
@@ -1184,10 +1203,10 @@ function editQuestion(index) {
             <option value="ESE" ${q.cat==='ESE'?'selected':''}>ESE</option>
         </select>
         <select id="edit-diff" class="editor-select">
-            <option value="Com" ${q.diff==='Com'?'selected':''}>Com (1x)</option>
-            <option value="STI" ${q.diff==='STI'?'selected':''}>STI (2x)</option>
-            <option value="BU1" ${q.diff==='BU1'?'selected':''}>BU1 (3x)</option>
-            <option value="BU2" ${q.diff==='BU2'?'selected':''}>BU2 (4x)</option>
+            <option value="Com" ${q.diff==='Com'?'selected':''}>CG (x0.75)</option>
+            <option value="STI" ${q.diff==='STI'?'selected':''}>STI2D (x1)</option>
+            <option value="BU1" ${q.diff==='BU1'?'selected':''}>BUT1 (x1.25)</option>
+            <option value="BU2" ${q.diff==='BU2'?'selected':''}>BUT2 (x1.5)</option>
         </select>
         <br>
         <input type="text" id="edit-q" class="editor-input" value="${q.q.replace(/"/g, '&quot;')}" placeholder="Texte question">
