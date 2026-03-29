@@ -97,6 +97,26 @@ button { font-family: inherit; outline: none; }
 .btn-correct { background-color: #2ecc71 !important; color: white !important; border-color: #27ae60 !important; }
 .btn-wrong { background-color: #e74c3c !important; color: white !important; border-color: #c0392b !important; }
 
+/* 🔥 NOUVEAU : PASTILLES DE COULEUR POUR LA DIFFICULTÉ 🔥 */
+.diff-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.55em;
+    font-weight: bold;
+    color: white;
+    vertical-align: middle;
+    margin-left: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    text-shadow: none; 
+}
+.diff-Com { background-color: #2ecc71; } /* Vert */
+.diff-STI { background-color: #f1c40f; color: #2c3e50; } /* Jaune */
+.diff-BU1 { background-color: #e67e22; } /* Orange */
+.diff-BU2 { background-color: #e74c3c; } /* Rouge */
+
 /* JAUGE DE PROGRESSION ET INFOS INTERMEDIAIRES */
 #progress-container { display: flex; justify-content: center; gap: 4px; margin-top: 25px; flex-wrap: wrap; }
 .progress-box { width: 18px; height: 10px; background-color: rgba(255,255,255,0.3); border-radius: 2px; }
@@ -225,7 +245,7 @@ th, td { padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.2); vert
     .logo-container { margin-top: 0; padding: 10px 20px; }
     h1 { font-size: 2.2em; }
 
-    /* Correction En-tête : Force le score sous le pseudo, et empeche "pts" de se couper */
+    /* Correction En-tête : Force le score sous le pseudo */
     #player-display {
         display: flex;
         flex-direction: column;
@@ -239,7 +259,7 @@ th, td { padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.2); vert
 
     .results-layout, .details-layout { grid-template-columns: 1fr; justify-items: center; text-align: center; }
     
-    /* 🔥 FIX GRAPHIQUE INVISIBLE SUR MOBILE 🔥 */
+    /* FIX GRAPHIQUE INVISIBLE SUR MOBILE */
     .results-chart-container, .details-chart-container {
         width: 100%;
         max-width: 300px;
@@ -247,7 +267,7 @@ th, td { padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.2); vert
 
     #best-path { font-size: 1.1em !important; }
     
-    /* MODALE DÉTAILS MOBILE : On centre tout proprement (Titre + Boutons) */
+    /* MODALE DÉTAILS MOBILE : On centre tout proprement */
     #modal-header-content { flex-direction: column; align-items: center; text-align: center; padding-right: 0; }
     .modal-header-actions { align-items: center; }
     

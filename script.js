@@ -78,7 +78,7 @@ let resultsChartInstance = null;
 let modalChartInstance = null;
 let currentViewingPlayerId = null; 
 
-// Poids des difficultés (Com: 0.5, STI: 1, BU1: 1.5, BU2: 2)
+// 🔥 NOUVEAUX COEFFICIENTS DE DIFFICULTÉ 🔥
 const diffWeights = { "Com": 0.5, "STI": 1, "BU1": 1.5, "BU2": 2 };
 
 // Chargement des questions depuis Firebase
@@ -110,7 +110,6 @@ function askPassword(customTitle = "⚠️ ZONE ADMINISTRATEUR ⚠️", customDe
         const submitBtn = document.getElementById('submit-pwd-btn');
         const cancelBtn = document.getElementById('cancel-pwd-btn');
         
-        // Textes dynamiques pour masquer le terme administrateur aux joueurs
         titleEl.innerText = customTitle;
         descEl.innerText = customDesc;
         
@@ -285,7 +284,7 @@ async function startQuiz() {
     if (!audioCtx) audioCtx = new AudioContextClass(); 
     if (audioCtx.state === 'suspended') audioCtx.resume();
 
-    // 🔥 LE CHEAT CODE "MANON" EST BIEN LÀ 🔥
+    // 🔥 LE CHEAT CODE "MANON" EST LÀ 🔥
     if (safeName.toLowerCase() === "manon") {
         playerName = "Manon";
         scoresCount = {AII: 5, EME: 7, ESE: 6}; 
@@ -297,7 +296,7 @@ async function startQuiz() {
             let fakeCat = i < 10 ? "AII" : (i < 20 ? "EME" : "ESE");
             playerSessionDetails.push({
                 cat: fakeCat, diff: "BU2", q: `Question masquée ${i+1} (Mode Démo)`, 
-                isCorrect: true, time: 1.5, points: 850, correctAnsText: "Réponse parfaite !"
+                isCorrect: true, time: 1.5, points: 1850, correctAnsText: "Réponse parfaite !"
             });
         }
         
@@ -310,7 +309,6 @@ async function startQuiz() {
         return; 
     }
 
-    // Vérification de sécurité anti-doublon dans Firebase
     try {
         const snapshot = await get(ref(db, 'scores'));
         if (snapshot.exists()) {
@@ -321,9 +319,7 @@ async function startQuiz() {
                 }
             }
         }
-    } catch(e) { 
-        console.error(e); 
-    }
+    } catch(e) { console.error(e); }
 
     playerName = safeName; 
     playerPin = ""; 
@@ -334,7 +330,6 @@ async function startQuiz() {
     currentQIndex = 0; 
     playerSessionDetails = [];
     
-    // Mixage des questions depuis la base de données dynamique
     let selected = [];
     ['AII', 'EME', 'ESE'].forEach(cat => {
         let catQ = dynamicDB.filter(q => q.cat === cat);
@@ -346,7 +341,6 @@ async function startQuiz() {
     });
     currentQuestions = selected.sort(() => 0.5 - Math.random());
     
-    // Génération de la barre de progression
     let progContainer = document.getElementById('progress-container'); 
     progContainer.innerHTML = '';
     
@@ -371,7 +365,23 @@ function loadQuestion() {
     document.getElementById('timer-text').innerText = `⏱️ ${timeLeft}s`;
 
     let qData = currentQuestions[currentQIndex];
-    document.getElementById('question-text').innerText = `Q${currentQIndex + 1}/${totalQuestions} : ${qData.q}`;
+    let diffClass = "diff-" + qData.diff;
+    
+    // NOUVEAU : Affichage de la pastille de couleur à côté de la question
+    let qBox = document.getElementById('question-text');
+    qBox.innerHTML = ''; 
+    qBox.appendChild(document.createTextNode(`Q${currentQIndex + 1}/${totalQuestions} `));
+    
+    let badge = document.createElement('span');
+    badge.className = `diff-badge ${diffClass}`;
+    badge.innerText = qData.diff;
+    qBox.appendChild(badge);
+    
+    qBox.appendChild(document.createTextNode(` : `));
+    
+    let qTextSpan = document.createElement('span');
+    qTextSpan.innerText = qData.q;
+    qBox.appendChild(qTextSpan);
     
     let container = document.getElementById('answers-container'); 
     container.innerHTML = ''; 
@@ -424,7 +434,11 @@ function processAnswer(selectedIndex, correctIndex, clickedBtn) {
         if(clickedBtn) clickedBtn.classList.add('btn-correct'); 
         box.classList.add('prog-correct');
         
-        pointsGained = Math.round((timeLeft / timeLimit) * 500) + 500;
+        // 🔥 NOUVEAU CALCUL : Les points dépendent du temps ET de la difficulté !
+        let basePoints = Math.round((timeLeft / timeLimit) * 500) + 500;
+        let coef = diffWeights[qData.diff] || 1;
+        pointsGained = Math.round(basePoints * coef);
+        
         scoreTotal += pointsGained; 
         scoresPoints[qData.cat] += pointsGained;
     } else {
@@ -437,7 +451,6 @@ function processAnswer(selectedIndex, correctIndex, clickedBtn) {
         });
     }
     
-    // Enregistrement des détails de la question
     playerSessionDetails.push({ 
         cat: qData.cat, 
         diff: qData.diff, 
@@ -449,10 +462,7 @@ function processAnswer(selectedIndex, correctIndex, clickedBtn) {
     });
 
     document.getElementById('live-score').innerText = `${scoreTotal} pts`;
-    
-    setTimeout(() => { 
-        showIntermediateScreen(isCorrect, pointsGained, qData.trivia, isTimeout); 
-    }, 1500);
+    setTimeout(() => { showIntermediateScreen(isCorrect, pointsGained, qData.trivia, isTimeout); }, 1500);
 }
 
 function showIntermediateScreen(isCorrect, points, trivia, isTimeout) {
@@ -490,7 +500,7 @@ function showIntermediateScreen(isCorrect, points, trivia, isTimeout) {
     
     document.getElementById('trivia-text').innerText = trivia; 
     
-    // CHANGEMENT DU BOUTON SI C'EST LA TOUTE DERNIÈRE QUESTION
+    // NOUVEAU : Changement du bouton si c'est la toute dernière question
     let nextBtn = document.getElementById('next-question-btn');
     if (currentQIndex === totalQuestions - 1) {
         nextBtn.innerText = "Voir mon résultat ➡️";
@@ -532,20 +542,23 @@ const customCanvasBackgroundColor = {
     }
 };
 
+// 🔥 NOUVEAU CALCUL RADAR : Basé sur le ratio (Points gagnés / Points Maximum possibles) 🔥
 function calculateRadarData(sessionDetails) {
-    let stats = { AII: {max:0, val:0}, EME: {max:0, val:0}, ESE: {max:0, val:0} };
+    let stats = { AII: {maxPts:0, valPts:0}, EME: {maxPts:0, valPts:0}, ESE: {maxPts:0, valPts:0} };
     
     sessionDetails.forEach(q => {
         let w = diffWeights[q.diff] || 1; 
+        let maxQPoints = 1000 * w; // Maximum possible : 1000 points de base * coefficient
+        
         if(stats[q.cat]) {
-            stats[q.cat].max += w;
-            if(q.isCorrect) stats[q.cat].val += w;
+            stats[q.cat].maxPts += maxQPoints;
+            if(q.isCorrect) stats[q.cat].valPts += q.points;
         }
     });
     
-    let pAII = stats.AII.max ? Math.round((stats.AII.val / stats.AII.max) * 100) : 0;
-    let pEME = stats.EME.max ? Math.round((stats.EME.val / stats.EME.max) * 100) : 0;
-    let pESE = stats.ESE.max ? Math.round((stats.ESE.val / stats.ESE.max) * 100) : 0;
+    let pAII = stats.AII.maxPts ? Math.round((stats.AII.valPts / stats.AII.maxPts) * 100) : 0;
+    let pEME = stats.EME.maxPts ? Math.round((stats.EME.valPts / stats.EME.maxPts) * 100) : 0;
+    let pESE = stats.ESE.maxPts ? Math.round((stats.ESE.valPts / stats.ESE.maxPts) * 100) : 0;
     
     return [pAII, pEME, pESE];
 }
@@ -557,7 +570,6 @@ function drawRadarChart(canvasId, dataArray, chartInstanceToUpdate) {
         chartInstanceToUpdate.destroy(); 
     }
     
-    // FUSION de la catégorie et du pourcentage
     const customLabels = [
         `AII : ${dataArray[0]}%`,
         `EME : ${dataArray[1]}%`,
@@ -583,8 +595,8 @@ function drawRadarChart(canvasId, dataArray, chartInstanceToUpdate) {
         plugins: [customCanvasBackgroundColor], 
         options: {
             animation: false,
-            responsive: true, // ✅ FORCE LE GRAPHIQUE À S'ADAPTER AU MOBILE
-            maintainAspectRatio: false, // ✅ OBLIGATOIRE POUR EMPÊCHER LE CANVAS DE DISPARAÎTRE
+            responsive: true, 
+            maintainAspectRatio: false,
             layout: { padding: 15 },
             scales: {
                 r: { 
@@ -607,12 +619,11 @@ function drawRadarChart(canvasId, dataArray, chartInstanceToUpdate) {
 async function showResults() {
     resetIdleTimer();
     
-    // Génération du code PIN du joueur
     playerPin = Math.floor(1000 + Math.random() * 9000).toString();
     
     let htmlScores = ""; 
     let bestCat = ""; 
-    let maxScore = -1;
+    let maxScorePts = -1; // 🔥 NOUVEAU : On départage sur le total des POINTS, plus d'égalités !
     
     for (let cat of ["AII", "EME", "ESE"]) {
         let count = scoresCount[cat]; 
@@ -621,10 +632,10 @@ async function showResults() {
         
         htmlScores += `Parcours ${cat} : <span style="color:${color}; font-weight:bold;">${count}/10</span> - <span style="color:#bdc3c7;">${pts} pts</span><br>`;
         
-        if (count > maxScore) { 
-            maxScore = count; 
+        if (pts > maxScorePts) { 
+            maxScorePts = pts; 
             bestCat = cat; 
-        } else if (count === maxScore) { 
+        } else if (pts === maxScorePts && maxScorePts > 0) { 
             bestCat += " & " + cat; 
         }
     }
@@ -727,7 +738,6 @@ async function openModal(playerId) {
         let allPlayers = Object.values(scoresObj);
         let player = { id: playerId, ...scoresObj[playerId] };
         
-        // --- SÉCURITÉ : Modale neutre pour l'utilisateur normal ---
         let pwd = await askPassword(
             "🔒 Accès Sécurisé", 
             `Entrez le code d'accès de ${player.Candidat} :`
@@ -756,7 +766,6 @@ async function openModal(playerId) {
             }
         });
 
-        // En-tête Flexbox avec le bouton de suppression
         let safePin = player.PIN || "Aucun";
         document.getElementById('modal-header-content').innerHTML = `
             <h2 style="color:#f1c40f; margin:0; font-size:1.6em;">Analyse de : ${player.Candidat}<br><span style="font-size:0.7em; color:#bdc3c7;">Code : ${safePin}</span></h2>
@@ -773,9 +782,12 @@ async function openModal(playerId) {
                 let resIcon = q.isCorrect ? `<span class="correct-cell">✅</span>` : `<span class="incorrect-cell">❌</span>`;
                 let successRate = (globalStats[q.q] && globalStats[q.q].asked > 0) ? Math.round((globalStats[q.q].correct / globalStats[q.q].asked) * 100) + "%" : "-";
                 
+                // 🔥 NOUVEAU : PASTILLE DE DIFFICULTÉ DANS LE TABLEAU 🔥
+                let badgeHtml = `<span class="diff-badge diff-${q.diff || 'Com'}">${q.diff || '-'}</span>`;
+                
                 tbody.innerHTML += `<tr>
                     <td style="text-align:center;">${q.cat}</td>
-                    <td style="text-align:center;">${q.diff || '-'}</td>
+                    <td style="text-align:center;">${badgeHtml}</td>
                     <td>${q.q}</td>
                     <td style="text-align:center;">${resIcon}</td>
                     <td style="text-align:center;">${q.points}</td>
@@ -799,13 +811,12 @@ async function toggleKeep(playerId, isChecked) {
     catch (e) { console.error(e); } 
 }
 
-// FONCTION DE SUPPRESSION INDIVIDUELLE
 async function deletePlayerScore(playerId) {
     if (confirm("⚠️ Voulez-vous vraiment supprimer ce joueur de la base de données ? Action irréversible.")) {
         try {
             await set(ref(db, 'scores/' + playerId), null);
             closeModal();
-            showPodium(); // Rafraîchit le tableau automatiquement
+            showPodium(); 
         } catch (e) {
             console.error(e);
             alert("Erreur lors de la suppression.");
@@ -931,7 +942,6 @@ function buildPDF(playerData, chartDataUrl) {
     let logoH = 18;
     
     const finalize = (logoUrl, qrUrl) => {
-        // En-tête 
         if(logoUrl) { 
             let logoX = 105 - (logoW / 2); 
             doc.addImage(logoUrl, 'PNG', logoX, 10, logoW, logoH); 
@@ -941,7 +951,6 @@ function buildPDF(playerData, chartDataUrl) {
         doc.setFontSize(20);
         doc.text("BILAN DE COMPÉTENCES GEII", 105, 38, {align: "center"});
         
-        // Infos Joueur
         doc.setFontSize(14); 
         doc.setTextColor(0, 102, 204);
         doc.text(`Candidat : ${playerData.Candidat}`, 15, 50);
@@ -956,12 +965,10 @@ function buildPDF(playerData, chartDataUrl) {
         let profil = playerData.Profil || document.getElementById('best-path').innerText.replace('👉 PARCOURS CONSEILLÉ : ', '').replace(' 👈', '');
         doc.text(`Profil Recommandé : ${profil}`, 15, 74);
 
-        // Graphique Radar
         if(chartDataUrl) { 
             doc.addImage(chartDataUrl, 'PNG', 120, 40, 75, 75); 
         }
 
-        // Tableau
         let tableData = [];
         if(playerData.SessionDetails) { 
             playerData.SessionDetails.forEach(q => { 
@@ -978,7 +985,6 @@ function buildPDF(playerData, chartDataUrl) {
             columnStyles: { 0: { cellWidth: 20 }, 1: { cellWidth: 90 }, 2: { cellWidth: 20 }, 3: { cellWidth: 50 } }
         });
 
-        // --- CONCLUSION, LIEN ET QR CODE ---
         let finalY = doc.lastAutoTable.finalY + 15;
 
         if (finalY > 220) { 
@@ -997,14 +1003,12 @@ function buildPDF(playerData, chartDataUrl) {
         let conclusionText = "Attention : Ce bilan est issu d'un jeu récréatif scientifique. Il ne définit en rien ton avenir scolaire ou professionnel, mais souligne tes affinités actuelles. L'important est de choisir la voie qui te passionne !";
         doc.text(conclusionText, 15, finalY + 8, { maxWidth: 125, align: 'justify' });
 
-        // Appel à l'action
         doc.setFont("helvetica", "bold"); 
         doc.setFontSize(11); 
         doc.setTextColor(39, 174, 96);
         let rejouerText = "Envie de rejouer ou de relever le défi entre amis ?";
         doc.text(rejouerText, 15, finalY + 28);
         
-        // Texte cliquable
         doc.setFont("helvetica", "bold");
         doc.setFontSize(10);
         doc.setTextColor(52, 152, 219); 
@@ -1018,13 +1022,11 @@ function buildPDF(playerData, chartDataUrl) {
 
         doc.link(15, finalY + 30, textWidth, 6, { url: 'https://5urio5.github.io/Jeu_GEII/' }); 
 
-        // Suite de la phrase
         doc.setFont("helvetica", "normal");
         doc.setTextColor(80, 80, 80);
         let suiteText = " pour y accéder, ou scanne le code QR";
         doc.text(suiteText, 15 + textWidth + 1, finalY + 34);
 
-        // Ajout du QR Code à droite en toute sécurité
         if(qrUrl) {
             doc.addImage(qrUrl, 'PNG', 155, finalY + 5, 35, 35); 
             doc.setFontSize(8); 
@@ -1036,7 +1038,6 @@ function buildPDF(playerData, chartDataUrl) {
         doc.save(`Bilan_GEII_${playerData.Candidat}.pdf`);
     };
 
-    // Chargement asynchrone du Logo et du QR Code
     let logoLoaded = false; let logoDataUrl = null;
     let qrLoaded = false; let qrDataUrl = null;
 
@@ -1302,13 +1303,11 @@ document.addEventListener('keydown', function(e) {
     const editorModal = document.getElementById('editor-modal');
     const screensaver = document.getElementById('screensaver');
     
-    // Sortir de l'écran de veille dès qu'on touche le clavier
     if (!screensaver.classList.contains('hidden')) { 
         hideScreensaver(); 
         return; 
     }
     
-    // TOUCHE ECHAP (Fermer, Annuler)
     if (e.key === 'Escape') { 
         if (detailsModal.classList.contains('show')) { 
             closeModal(); 
@@ -1321,7 +1320,6 @@ document.addEventListener('keydown', function(e) {
         } 
     }
     
-    // TOUCHE ENTRÉE (Actions contextuelles de confort)
     if (e.key === 'Enter') { 
         if (pwdModal.classList.contains('show')) {
             return;
@@ -1337,10 +1335,9 @@ document.addEventListener('keydown', function(e) {
         } 
     }
     
-    // FLÈCHES DU CLAVIER (Navigation dans les réponses)
     if (activeScreen && activeScreen.id === 'screen-game') {
         if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
-            e.preventDefault(); // Bloque le scrolling de la page
+            e.preventDefault(); 
             
             const btns = Array.from(document.querySelectorAll('#answers-container .answer-btn:not(:disabled)')); 
             if (btns.length === 0) return;
@@ -1348,10 +1345,8 @@ document.addEventListener('keydown', function(e) {
             let currentIndex = btns.indexOf(document.activeElement);
             
             if (currentIndex === -1) { 
-                // Aucune case n'est encore sélectionnée, on encadre la première
                 btns[0].focus(); 
             } else { 
-                // Navigation circulaire entre les options
                 if (e.key === 'ArrowDown' || e.key === 'ArrowRight') { 
                     currentIndex = (currentIndex + 1) % btns.length; 
                 } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') { 
