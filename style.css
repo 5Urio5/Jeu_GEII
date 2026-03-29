@@ -172,7 +172,7 @@ th, td { padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.2); vert
    ADAPTATION MOBILE & RESPONSIVE
    ========================================== */
 @media (max-width: 768px) {
-    /* Repousse le contenu sous les boutons absolus */
+    /* Repousse le contenu sous les boutons absolus pour éviter les superpositions */
     .container { padding-top: 60px; padding-left: 15px; padding-right: 15px; }
     #btn-manual-screensaver, .btn-cancel-quiz { top: 15px; right: 15px; font-size: 1.6em; }
     

@@ -76,7 +76,9 @@
 
     <div id="screen-results" class="container hidden slide-in-right">
         <h1>🎉 RÉSULTAT FINAL ! 🎉</h1>
-        <h3 id="final-score" style="color:#f1c40f; font-size: 2em; margin-bottom: 10px;">Score : 0 pts</h3>
+        <h3 id="final-score" style="color:#f1c40f; font-size: 2em; margin-bottom: 5px;">Score : 0 pts</h3>
+        
+        <div id="player-pin-display" style="color: #e74c3c; font-size: 1.5em; font-weight: bold; background: white; padding: 10px 20px; border-radius: 10px; display: inline-block; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">Code secret : 0000</div>
         
         <div class="results-layout">
             <div class="results-stats">
@@ -173,10 +175,10 @@
 
     <div id="password-modal">
         <div class="modal-content pwd-modal-box">
-            <h2 style="color:#f1c40f; margin-top: 0;">⚠️ ZONE ADMINISTRATEUR ⚠️</h2>
-            <p style="font-size: 1.2em; margin-bottom: 20px;">Veuillez entrer le mot de passe :</p>
+            <h2 id="pwd-modal-title" style="color:#f1c40f; margin-top: 0;">⚠️ ZONE ADMINISTRATEUR ⚠️</h2>
+            <p id="pwd-modal-desc" style="font-size: 1.2em; margin-bottom: 20px;">Veuillez entrer le mot de passe :</p>
             <div class="pwd-container">
-                <input type="password" id="admin-pwd-input" placeholder="Mot de passe" autocomplete="off">
+                <input type="password" id="admin-pwd-input" placeholder="Mot de passe ou Code" autocomplete="off">
                 <span id="toggle-pwd-btn" class="pwd-toggle" onclick="togglePasswordVisibility()" title="Afficher/Masquer">👁️</span>
             </div>
             <div style="display: flex; gap: 10px; justify-content: center; margin-top: 20px;">

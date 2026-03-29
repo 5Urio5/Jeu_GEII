@@ -57,6 +57,7 @@ window.resetQuestionsToDefault = resetQuestionsToDefault;
 // VARIABLES GLOBALES & CHARGEMENT
 // ==========================================
 let playerName = ""; 
+let playerPin = ""; // Code à 4 chiffres du joueur
 let currentQuestions = []; 
 let currentQIndex = 0;
 let scoresPoints = {AII: 0, EME: 0, ESE: 0}; 
@@ -79,9 +80,10 @@ let resultsChartInstance = null;
 let modalChartInstance = null;
 let currentViewingPlayerId = null; 
 
-// Poids des difficultés
+// Poids des difficultés (Crucial pour la justesse du Radar Chart)
 const diffWeights = { "Com": 1, "STI": 2, "BU1": 3, "BU2": 4 };
 
+// Chargement des questions depuis Firebase
 async function loadQuestionsFromFirebase() {
     try {
         const snap = await get(ref(db, 'questions'));
@@ -99,14 +101,20 @@ async function loadQuestionsFromFirebase() {
 loadQuestionsFromFirebase();
 
 // ==========================================
-// 🛡️ MODALE DU MOT DE PASSE
+// 🛡️ MODALE DU MOT DE PASSE (DYNAMIQUE)
 // ==========================================
-function askPassword() {
+function askPassword(customTitle = "⚠️ ZONE ADMINISTRATEUR ⚠️", customDesc = "Veuillez entrer le mot de passe :") {
     return new Promise((resolve) => {
         const modal = document.getElementById('password-modal');
+        const titleEl = document.getElementById('pwd-modal-title');
+        const descEl = document.getElementById('pwd-modal-desc');
         const input = document.getElementById('admin-pwd-input');
         const submitBtn = document.getElementById('submit-pwd-btn');
         const cancelBtn = document.getElementById('cancel-pwd-btn');
+        
+        // Configuration dynamique des textes de la modale
+        titleEl.innerText = customTitle;
+        descEl.innerText = customDesc;
         
         input.value = ''; 
         input.type = 'password';
@@ -292,6 +300,7 @@ async function startQuiz() {
     } catch(e) { console.error(e); }
 
     playerName = safeName; 
+    playerPin = ""; // On remet le PIN à zéro au cas où
     scoresPoints = {AII: 0, EME: 0, ESE: 0}; 
     scoresCount = {AII: 0, EME: 0, ESE: 0};
     scoreTotal = 0; 
@@ -470,7 +479,6 @@ function goToNextQuestion() {
 // ==========================================
 // RÉSULTATS ET GRAPHIQUES RADAR
 // ==========================================
-
 const customCanvasBackgroundColor = {
     id: 'customCanvasBackgroundColor',
     beforeDraw: (chart, args, options) => {
@@ -508,7 +516,7 @@ function drawRadarChart(canvasId, dataArray, chartInstanceToUpdate) {
         chartInstanceToUpdate.destroy(); 
     }
     
-    // FUSION de la catégorie et du pourcentage pour que ça ne se chevauche jamais !
+    // FUSION PROPRE : La catégorie et le pourcentage sont soudés pour éviter tout chevauchement !
     const customLabels = [
         `AII : ${dataArray[0]}%`,
         `EME : ${dataArray[1]}%`,
@@ -531,7 +539,6 @@ function drawRadarChart(canvasId, dataArray, chartInstanceToUpdate) {
                 borderWidth: 2
             }]
         },
-        // SUPPRESSION DU PLUGIN DATALABELS ICI
         plugins: [customCanvasBackgroundColor], 
         options: {
             animation: false,
@@ -555,6 +562,9 @@ function drawRadarChart(canvasId, dataArray, chartInstanceToUpdate) {
 async function showResults() {
     resetIdleTimer();
     
+    // GÉNÉRATION DU CODE SECRET À 4 CHIFFRES
+    playerPin = Math.floor(1000 + Math.random() * 9000).toString();
+    
     let htmlScores = ""; 
     let bestCat = ""; 
     let maxScore = -1;
@@ -575,6 +585,7 @@ async function showResults() {
     }
     
     document.getElementById('final-score').innerText = `Score Final : ${scoreTotal} pts`;
+    document.getElementById('player-pin-display').innerText = `Code d'accès : ${playerPin}`;
     document.getElementById('scores-display').innerHTML = htmlScores;
     document.getElementById('best-path').innerText = `👉 PARCOURS CONSEILLÉ : ${bestCat} 👈`;
 
@@ -600,11 +611,12 @@ async function showResults() {
         if (emailPrompt) playerEmail = sanitizeString(emailPrompt.trim());
     }
 
-    saveScoreFirebase(playerName, scoreTotal, bestCat, playerEmail);
+    // SAUVEGARDE DANS FIREBASE AVEC LE PIN
+    saveScoreFirebase(playerName, scoreTotal, bestCat, playerEmail, playerPin);
     slideTo('screen-results');
 }
 
-function saveScoreFirebase(name, totalScore, profil, email) {
+function saveScoreFirebase(name, totalScore, profil, email, pin) {
     push(ref(db, 'scores'), { 
         "Candidat": name, 
         "Score Points": totalScore, 
@@ -613,7 +625,8 @@ function saveScoreFirebase(name, totalScore, profil, email) {
         "ScoresPoints": scoresPoints, 
         "SessionDetails": playerSessionDetails, 
         "keep": false, 
-        "Email": email || "" 
+        "Email": email || "",
+        "PIN": pin || "" // Enregistrement du code secret
     });
 }
 
@@ -670,6 +683,18 @@ async function openModal(playerId) {
         let allPlayers = Object.values(scoresObj);
         let player = { id: playerId, ...scoresObj[playerId] };
         
+        // --- SÉCURITÉ : DEMANDE DE CODE SECRET OU ADMIN AVANT D'OUVRIR ---
+        let pwd = await askPassword(
+            "🔒 Accès Sécurisé", 
+            `Entrez le code à 4 chiffres de ${player.Candidat} ou le mot de passe Admin :`
+        );
+        
+        if (pwd !== ADMIN_PASSWORD && pwd !== player.PIN) {
+            if (pwd !== null) alert("❌ Code ou mot de passe incorrect.");
+            return; // On annule l'ouverture de la modale
+        }
+
+        // Si le code est bon, on continue...
         currentViewingPlayerId = playerId;
 
         if(player.SessionDetails) {
@@ -688,8 +713,10 @@ async function openModal(playerId) {
             }
         });
 
+        // Affichage dynamique du Code dans l'en-tête de la modale
+        let safePin = player.PIN || "Aucun";
         document.getElementById('modal-header-content').innerHTML = `
-            <h2 style="color:#f1c40f; margin-top:0; display:inline-block;">Analyse de : ${player.Candidat}</h2>
+            <h2 style="color:#f1c40f; margin-top:0; display:inline-block; font-size:1.6em;">Analyse de : ${player.Candidat} - Code : ${safePin}</h2>
             <label class="keep-label"><input type="checkbox" onchange="toggleKeep('${player.id}', this.checked)" ${player.keep ? "checked" : ""}> 📌 Conserver</label>`;
 
         let tbody = document.getElementById('modal-table-body'); 
@@ -763,6 +790,7 @@ async function downloadExcel() {
                 let p = scoresObj[key];
                 dataPlayers.push({ 
                     "Candidat": p.Candidat || "Inconnu", 
+                    "Code Secret": p.PIN || "N/A", // Intégration du code secret dans l'Excel
                     "Score Global": p["Score Points"] || 0, 
                     "Profil": p.Profil || "", 
                     "Points AII": p.ScoresPoints ? p.ScoresPoints.AII : 0, 
@@ -858,12 +886,16 @@ function buildPDF(playerData, chartDataUrl) {
         doc.setTextColor(0, 102, 204);
         doc.text(`Candidat : ${playerData.Candidat}`, 15, 50);
         
-        doc.setTextColor(0, 0, 0); 
+        // NOUVEAU : Ajout du Code sur le PDF
+        doc.setTextColor(231, 76, 60); // Rouge
         doc.setFontSize(12);
-        doc.text(`Score Final : ${playerData["Score Points"] || scoreTotal} pts`, 15, 58);
+        doc.text(`Code : ${playerData.PIN || "N/A"}`, 15, 58);
+        
+        doc.setTextColor(0, 0, 0); 
+        doc.text(`Score Final : ${playerData["Score Points"] || scoreTotal} pts`, 15, 66);
         
         let profil = playerData.Profil || document.getElementById('best-path').innerText.replace('👉 PARCOURS CONSEILLÉ : ', '').replace(' 👈', '');
-        doc.text(`Profil Recommandé : ${profil}`, 15, 66);
+        doc.text(`Profil Recommandé : ${profil}`, 15, 74);
 
         // Graphique Radar
         if(chartDataUrl) { 
@@ -879,7 +911,7 @@ function buildPDF(playerData, chartDataUrl) {
         }
         
         doc.autoTable({
-            startY: 120,
+            startY: 125, // Un peu plus bas pour faire place au Code Secret
             head: [['Catégorie', 'Question Posée', 'Résultat', 'Bonne Réponse']],
             body: tableData,
             headStyles: { fillColor: [46, 204, 113] },
@@ -993,28 +1025,24 @@ function buildPDF(playerData, chartDataUrl) {
 function generatePlayerPDF() {
     if(!resultsChartInstance) return alert("Graphique non disponible.");
     let chartUrl = resultsChartInstance.toBase64Image();
-    let pData = { Candidat: playerName, "Score Points": scoreTotal, SessionDetails: playerSessionDetails };
+    // On passe le playerPin actuel pour le PDF du joueur qui vient de finir
+    let pData = { Candidat: playerName, "Score Points": scoreTotal, SessionDetails: playerSessionDetails, PIN: playerPin };
     buildPDF(pData, chartUrl);
 }
 
+// PLUS BESOIN de demander le mot de passe ici puisqu'on l'a déjà demandé dans openModal() !
 async function generateAdminPDF() {
-    let pwd = await askPassword();
-    
-    if (pwd === ADMIN_PASSWORD) {
-        if(!currentViewingPlayerId || !modalChartInstance) return;
-        try {
-            const snapshot = await get(ref(db, `scores/${currentViewingPlayerId}`));
-            if (snapshot.exists()) { 
-                let pData = snapshot.val(); 
-                let chartUrl = modalChartInstance.toBase64Image(); 
-                buildPDF(pData, chartUrl); 
-            }
-        } catch(e) { 
-            console.error(e); 
-            alert("Erreur lors de la récupération du joueur."); 
+    if(!currentViewingPlayerId || !modalChartInstance) return;
+    try {
+        const snapshot = await get(ref(db, `scores/${currentViewingPlayerId}`));
+        if (snapshot.exists()) { 
+            let pData = snapshot.val(); 
+            let chartUrl = modalChartInstance.toBase64Image(); 
+            buildPDF(pData, chartUrl); 
         }
-    } else if (pwd !== null) { 
-        alert("❌ Mot de passe incorrect."); 
+    } catch(e) { 
+        console.error(e); 
+        alert("Erreur lors de la récupération du joueur."); 
     }
 }
 
