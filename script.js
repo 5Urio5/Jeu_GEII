@@ -37,6 +37,7 @@ window.showPodium = showPodium;
 window.openModal = openModal; 
 window.closeModal = closeModal;
 window.toggleKeep = toggleKeep; 
+window.deletePlayerScore = deletePlayerScore; // EXPOSITION DE LA NOUVELLE FONCTION SUPPRIMER
 window.resetPodium = resetPodium; 
 window.downloadExcel = downloadExcel;
 window.showScreensaver = showScreensaver; 
@@ -80,7 +81,6 @@ let currentViewingPlayerId = null;
 // Poids des difficultés (Com: 0.5, STI: 1, BU1: 1.5, BU2: 2)
 const diffWeights = { "Com": 0.5, "STI": 1, "BU1": 1.5, "BU2": 2 };
 
-// Chargement des questions depuis Firebase
 async function loadQuestionsFromFirebase() {
     try {
         const snap = await get(ref(db, 'questions'));
@@ -510,7 +510,6 @@ function goToNextQuestion() {
 // ==========================================
 // RÉSULTATS ET GRAPHIQUES RADAR
 // ==========================================
-
 const customCanvasBackgroundColor = {
     id: 'customCanvasBackgroundColor',
     beforeDraw: (chart, args, options) => {
@@ -548,7 +547,7 @@ function drawRadarChart(canvasId, dataArray, chartInstanceToUpdate) {
         chartInstanceToUpdate.destroy(); 
     }
     
-    // FUSION de la catégorie et du pourcentage pour éviter tout chevauchement (ex: AII : 85%)
+    // FUSION de la catégorie et du pourcentage
     const customLabels = [
         `AII : ${dataArray[0]}%`,
         `EME : ${dataArray[1]}%`,
@@ -577,7 +576,7 @@ function drawRadarChart(canvasId, dataArray, chartInstanceToUpdate) {
             layout: { padding: 15 },
             scales: {
                 r: { 
-                    // Verrouillage de l'échelle pour que le graphique soit toujours juste
+                    // CORRECTION DU GRAPHIQUE : on force l'échelle de 0 à 100 ici !
                     min: 0,
                     max: 100,
                     angleLines: { color: 'rgba(255, 255, 255, 0.2)' }, 
@@ -720,7 +719,7 @@ async function openModal(playerId) {
         // --- SÉCURITÉ : Modale neutre pour l'utilisateur normal ---
         let pwd = await askPassword(
             "🔒 Accès Sécurisé", 
-            `Code d'accès de ${player.Candidat} :`
+            `Entrez le code d'accès de ${player.Candidat} :`
         );
         
         if (pwd !== ADMIN_PASSWORD && pwd !== player.PIN) {
@@ -746,10 +745,14 @@ async function openModal(playerId) {
             }
         });
 
+        // NOUVEAU LAYOUT : En-tête Flexbox avec Bouton Supprimer
         let safePin = player.PIN || "Aucun";
         document.getElementById('modal-header-content').innerHTML = `
-            <h2 style="color:#f1c40f; margin-top:0; display:inline-block; font-size:1.6em;">Analyse de : ${player.Candidat} - Code : ${safePin}</h2>
-            <label class="keep-label"><input type="checkbox" onchange="toggleKeep('${player.id}', this.checked)" ${player.keep ? "checked" : ""}> 📌 Conserver</label>`;
+            <h2 style="color:#f1c40f; margin:0; font-size:1.6em;">Analyse de : ${player.Candidat}<br><span style="font-size:0.7em; color:#bdc3c7;">Code : ${safePin}</span></h2>
+            <div class="modal-header-actions">
+                <label class="keep-label"><input type="checkbox" onchange="toggleKeep('${player.id}', this.checked)" ${player.keep ? "checked" : ""}> 📌 Conserver</label>
+                <button class="delete-player-btn" onclick="deletePlayerScore('${player.id}')">🗑️ Supprimer</button>
+            </div>`;
 
         let tbody = document.getElementById('modal-table-body'); 
         tbody.innerHTML = '';
@@ -785,8 +788,22 @@ async function toggleKeep(playerId, isChecked) {
     catch (e) { console.error(e); } 
 }
 
+// FONCTION DE SUPPRESSION INDIVIDUELLE
+async function deletePlayerScore(playerId) {
+    if (confirm("⚠️ Voulez-vous vraiment supprimer ce joueur de la base de données ? Action irréversible.")) {
+        try {
+            await set(ref(db, 'scores/' + playerId), null);
+            closeModal();
+            showPodium(); // Rafraîchit le tableau automatiquement
+        } catch (e) {
+            console.error(e);
+            alert("Erreur lors de la suppression.");
+        }
+    }
+}
+
 async function resetPodium() {
-    let pwd = await askPassword();
+    let pwd = await askPassword("⚠️ ZONE ADMINISTRATEUR ⚠️", "Veuillez entrer le mot de passe :");
     
     if (pwd === ADMIN_PASSWORD) {
         if (confirm("⚠️ Voulez-vous vraiment effacer TOUS les scores ? Action irréversible.")) {
@@ -805,7 +822,7 @@ async function resetPodium() {
 // EXPORT EXCEL
 // ==========================================
 async function downloadExcel() {
-    let pwd = await askPassword();
+    let pwd = await askPassword("⚠️ ZONE ADMINISTRATEUR ⚠️", "Veuillez entrer le mot de passe :");
     
     if (pwd === ADMIN_PASSWORD) {
         try {
@@ -903,7 +920,7 @@ function buildPDF(playerData, chartDataUrl) {
     let logoH = 18;
     
     const finalize = (logoUrl, qrUrl) => {
-        // En-tête (Logo calculé pour ne pas s'écraser)
+        // En-tête 
         if(logoUrl) { 
             let logoX = 105 - (logoW / 2); 
             doc.addImage(logoUrl, 'PNG', logoX, 10, logoW, logoH); 
@@ -950,10 +967,9 @@ function buildPDF(playerData, chartDataUrl) {
             columnStyles: { 0: { cellWidth: 20 }, 1: { cellWidth: 90 }, 2: { cellWidth: 20 }, 3: { cellWidth: 50 } }
         });
 
-        // --- CONCLUSION, LIEN ET QR CODE SANS EMOJI ---
+        // --- CONCLUSION, LIEN ET QR CODE ---
         let finalY = doc.lastAutoTable.finalY + 15;
 
-        // Saut de page de sécurité
         if (finalY > 220) { 
             doc.addPage(); 
             finalY = 20; 
@@ -977,29 +993,26 @@ function buildPDF(playerData, chartDataUrl) {
         let rejouerText = "Envie de rejouer ou de relever le défi entre amis ?";
         doc.text(rejouerText, 15, finalY + 28);
         
-        // Texte cliquable et souligné "Clique ici"
+        // Texte cliquable
         doc.setFont("helvetica", "bold");
         doc.setFontSize(10);
         doc.setTextColor(52, 152, 219); 
         let clickText = "Clique ici";
         doc.text(clickText, 15, finalY + 34);
 
-        // Tracé du soulignement bleu
         let textWidth = doc.getTextWidth(clickText);
         doc.setDrawColor(52, 152, 219);
         doc.setLineWidth(0.3);
         doc.line(15, finalY + 35, 15 + textWidth, finalY + 35);
 
-        // La zone cliquable invisible
         doc.link(15, finalY + 30, textWidth, 6, { url: 'https://5urio5.github.io/Jeu_GEII/' }); 
 
-        // Suite de la phrase modifiée
         doc.setFont("helvetica", "normal");
         doc.setTextColor(80, 80, 80);
         let suiteText = " pour y accéder, ou scanne le code QR";
         doc.text(suiteText, 15 + textWidth + 1, finalY + 34);
 
-        // Ajout du QR Code à droite en toute sécurité (sans superposition)
+        // QR Code
         if(qrUrl) {
             doc.addImage(qrUrl, 'PNG', 155, finalY + 5, 35, 35); 
             doc.setFontSize(8); 
@@ -1029,7 +1042,6 @@ function buildPDF(playerData, chartDataUrl) {
         canvas.getContext('2d').drawImage(imgLogo, 0, 0); 
         logoDataUrl = canvas.toDataURL('image/png');
         
-        // Calcul exact du ratio du logo
         let ratio = imgLogo.naturalWidth / imgLogo.naturalHeight;
         logoH = 18;
         logoW = 18 * ratio;
@@ -1060,6 +1072,7 @@ function generatePlayerPDF() {
     buildPDF(pData, chartUrl);
 }
 
+// Plus de sécurité demandée ici car c'est fait en amont lors de l'ouverture de la modale "Détails"
 async function generateAdminPDF() {
     if(!currentViewingPlayerId || !modalChartInstance) return;
     try {
@@ -1300,7 +1313,6 @@ document.addEventListener('keydown', function(e) {
     // TOUCHE ENTRÉE (Actions contextuelles de confort)
     if (e.key === 'Enter') { 
         if (pwdModal.classList.contains('show')) {
-            // Géré par la modale
             return;
         }
         if (activeScreen) { 
@@ -1325,7 +1337,6 @@ document.addEventListener('keydown', function(e) {
             let currentIndex = btns.indexOf(document.activeElement);
             
             if (currentIndex === -1) { 
-                // Aucune case n'est encore sélectionnée, on encadre la première
                 btns[0].focus(); 
             } else { 
                 // Navigation circulaire entre les options
