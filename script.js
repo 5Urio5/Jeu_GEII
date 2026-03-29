@@ -57,7 +57,7 @@ window.resetQuestionsToDefault = resetQuestionsToDefault;
 // VARIABLES GLOBALES & CHARGEMENT
 // ==========================================
 let playerName = ""; 
-let playerPin = ""; // Code à 4 chiffres du joueur
+let playerPin = ""; 
 let currentQuestions = []; 
 let currentQIndex = 0;
 let scoresPoints = {AII: 0, EME: 0, ESE: 0}; 
@@ -72,16 +72,13 @@ let timerInterval;
 let idleTimer; 
 const IDLE_TIME = 120000; 
 
-// Base de données dynamique
 let dynamicDB = [];
-
-// Graphiques Chart.js instanciés
 let resultsChartInstance = null;
 let modalChartInstance = null;
 let currentViewingPlayerId = null; 
 
-// Poids des difficultés (Crucial pour la justesse du Radar Chart)
-const diffWeights = { "Com": 1, "STI": 2, "BU1": 3, "BU2": 4 };
+// Poids des difficultés (Com: 0.5, STI: 1, BU1: 1.5, BU2: 2)
+const diffWeights = { "Com": 0.5, "STI": 1, "BU1": 1.5, "BU2": 2 };
 
 // Chargement des questions depuis Firebase
 async function loadQuestionsFromFirebase() {
@@ -112,7 +109,7 @@ function askPassword(customTitle = "⚠️ ZONE ADMINISTRATEUR ⚠️", customDe
         const submitBtn = document.getElementById('submit-pwd-btn');
         const cancelBtn = document.getElementById('cancel-pwd-btn');
         
-        // Configuration dynamique des textes de la modale
+        // Textes dynamiques pour masquer le terme administrateur aux joueurs
         titleEl.innerText = customTitle;
         descEl.innerText = customDesc;
         
@@ -287,6 +284,32 @@ async function startQuiz() {
     if (!audioCtx) audioCtx = new AudioContextClass(); 
     if (audioCtx.state === 'suspended') audioCtx.resume();
 
+    // 🔥 LE CHEAT CODE "MANON" EST DE RETOUR 🔥
+    if (safeName.toLowerCase() === "manon") {
+        playerName = "Manon";
+        scoresCount = {AII: 5, EME: 7, ESE: 6}; 
+        scoresPoints = {AII: 4433, EME: 6451, ESE: 5567}; 
+        scoreTotal = 16451; 
+        
+        playerSessionDetails = [];
+        for(let i = 0; i < 30; i++) {
+            let fakeCat = i < 10 ? "AII" : (i < 20 ? "EME" : "ESE");
+            playerSessionDetails.push({
+                cat: fakeCat, diff: "BU2", q: `Question masquée ${i+1} (Mode Démo)`, 
+                isCorrect: true, time: 1.5, points: 850, correctAnsText: "Réponse parfaite !"
+            });
+        }
+        
+        slideTo('screen-suspense'); 
+        playSound('drumroll'); 
+        setTimeout(async () => { 
+            await showResults(); 
+            window.confetti({ particleCount: 150, spread: 100, origin: { y: 0.6 }, zIndex: 10000 }); 
+        }, 3000);
+        return; 
+    }
+
+    // Vérification de sécurité anti-doublon dans Firebase
     try {
         const snapshot = await get(ref(db, 'scores'));
         if (snapshot.exists()) {
@@ -297,10 +320,12 @@ async function startQuiz() {
                 }
             }
         }
-    } catch(e) { console.error(e); }
+    } catch(e) { 
+        console.error(e); 
+    }
 
     playerName = safeName; 
-    playerPin = ""; // On remet le PIN à zéro au cas où
+    playerPin = ""; 
     scoresPoints = {AII: 0, EME: 0, ESE: 0}; 
     scoresCount = {AII: 0, EME: 0, ESE: 0};
     scoreTotal = 0; 
@@ -308,6 +333,7 @@ async function startQuiz() {
     currentQIndex = 0; 
     playerSessionDetails = [];
     
+    // Mixage des questions depuis la base de données dynamique
     let selected = [];
     ['AII', 'EME', 'ESE'].forEach(cat => {
         let catQ = dynamicDB.filter(q => q.cat === cat);
@@ -319,6 +345,7 @@ async function startQuiz() {
     });
     currentQuestions = selected.sort(() => 0.5 - Math.random());
     
+    // Génération de la barre de progression
     let progContainer = document.getElementById('progress-container'); 
     progContainer.innerHTML = '';
     
@@ -326,7 +353,7 @@ async function startQuiz() {
         progContainer.innerHTML += `<div class="progress-box" id="box-${i}"></div>`; 
     }
     
-    document.getElementById('player-display').innerHTML = `👤 ${playerName} <span style="color:#f1c40f; margin-left:15px;" id="live-score">0 pts</span>`;
+    document.getElementById('player-display').innerHTML = `👤 ${playerName} <span style="margin-left:20px; color:#f1c40f;" id="live-score">0 pts</span>`;
     slideTo('screen-game'); 
     loadQuestion();
 }
@@ -409,6 +436,7 @@ function processAnswer(selectedIndex, correctIndex, clickedBtn) {
         });
     }
     
+    // Enregistrement des détails de la question
     playerSessionDetails.push({ 
         cat: qData.cat, 
         diff: qData.diff, 
@@ -420,7 +448,10 @@ function processAnswer(selectedIndex, correctIndex, clickedBtn) {
     });
 
     document.getElementById('live-score').innerText = `${scoreTotal} pts`;
-    setTimeout(() => { showIntermediateScreen(isCorrect, pointsGained, qData.trivia, isTimeout); }, 1500);
+    
+    setTimeout(() => { 
+        showIntermediateScreen(isCorrect, pointsGained, qData.trivia, isTimeout); 
+    }, 1500);
 }
 
 function showIntermediateScreen(isCorrect, points, trivia, isTimeout) {
@@ -479,6 +510,7 @@ function goToNextQuestion() {
 // ==========================================
 // RÉSULTATS ET GRAPHIQUES RADAR
 // ==========================================
+
 const customCanvasBackgroundColor = {
     id: 'customCanvasBackgroundColor',
     beforeDraw: (chart, args, options) => {
@@ -516,7 +548,7 @@ function drawRadarChart(canvasId, dataArray, chartInstanceToUpdate) {
         chartInstanceToUpdate.destroy(); 
     }
     
-    // FUSION PROPRE : La catégorie et le pourcentage sont soudés pour éviter tout chevauchement !
+    // FUSION de la catégorie et du pourcentage pour éviter tout chevauchement (ex: AII : 85%)
     const customLabels = [
         `AII : ${dataArray[0]}%`,
         `EME : ${dataArray[1]}%`,
@@ -545,10 +577,13 @@ function drawRadarChart(canvasId, dataArray, chartInstanceToUpdate) {
             layout: { padding: 15 },
             scales: {
                 r: { 
+                    // Verrouillage de l'échelle pour que le graphique soit toujours juste
+                    min: 0,
+                    max: 100,
                     angleLines: { color: 'rgba(255, 255, 255, 0.2)' }, 
                     grid: { color: 'rgba(255, 255, 255, 0.2)' }, 
                     pointLabels: { color: '#fff', font: { size: 14, weight: 'bold' } }, 
-                    ticks: { display: false, min: 0, max: 100, stepSize: 20 } 
+                    ticks: { display: false, stepSize: 20 } 
                 }
             },
             plugins: { 
@@ -562,7 +597,7 @@ function drawRadarChart(canvasId, dataArray, chartInstanceToUpdate) {
 async function showResults() {
     resetIdleTimer();
     
-    // GÉNÉRATION DU CODE SECRET À 4 CHIFFRES
+    // Génération du code PIN du joueur
     playerPin = Math.floor(1000 + Math.random() * 9000).toString();
     
     let htmlScores = ""; 
@@ -611,7 +646,6 @@ async function showResults() {
         if (emailPrompt) playerEmail = sanitizeString(emailPrompt.trim());
     }
 
-    // SAUVEGARDE DANS FIREBASE AVEC LE PIN
     saveScoreFirebase(playerName, scoreTotal, bestCat, playerEmail, playerPin);
     slideTo('screen-results');
 }
@@ -626,7 +660,7 @@ function saveScoreFirebase(name, totalScore, profil, email, pin) {
         "SessionDetails": playerSessionDetails, 
         "keep": false, 
         "Email": email || "",
-        "PIN": pin || "" // Enregistrement du code secret
+        "PIN": pin || "" 
     });
 }
 
@@ -683,18 +717,17 @@ async function openModal(playerId) {
         let allPlayers = Object.values(scoresObj);
         let player = { id: playerId, ...scoresObj[playerId] };
         
-        // --- SÉCURITÉ : DEMANDE DE CODE SECRET OU ADMIN AVANT D'OUVRIR ---
+        // --- SÉCURITÉ : Modale neutre pour l'utilisateur normal ---
         let pwd = await askPassword(
             "🔒 Accès Sécurisé", 
-            `Entrez le code à 4 chiffres de ${player.Candidat} ou le mot de passe Admin :`
+            `Code d'accès de ${player.Candidat} :`
         );
         
         if (pwd !== ADMIN_PASSWORD && pwd !== player.PIN) {
-            if (pwd !== null) alert("❌ Code ou mot de passe incorrect.");
-            return; // On annule l'ouverture de la modale
+            if (pwd !== null) alert("❌ Code incorrect.");
+            return; 
         }
 
-        // Si le code est bon, on continue...
         currentViewingPlayerId = playerId;
 
         if(player.SessionDetails) {
@@ -713,7 +746,6 @@ async function openModal(playerId) {
             }
         });
 
-        // Affichage dynamique du Code dans l'en-tête de la modale
         let safePin = player.PIN || "Aucun";
         document.getElementById('modal-header-content').innerHTML = `
             <h2 style="color:#f1c40f; margin-top:0; display:inline-block; font-size:1.6em;">Analyse de : ${player.Candidat} - Code : ${safePin}</h2>
@@ -790,7 +822,7 @@ async function downloadExcel() {
                 let p = scoresObj[key];
                 dataPlayers.push({ 
                     "Candidat": p.Candidat || "Inconnu", 
-                    "Code Secret": p.PIN || "N/A", // Intégration du code secret dans l'Excel
+                    "Code Secret": p.PIN || "N/A", 
                     "Score Global": p["Score Points"] || 0, 
                     "Profil": p.Profil || "", 
                     "Points AII": p.ScoresPoints ? p.ScoresPoints.AII : 0, 
@@ -861,7 +893,7 @@ async function downloadExcel() {
 }
 
 // ==========================================
-// EXPORT PDF (Bilan parfait avec Logo non écrasé)
+// EXPORT PDF
 // ==========================================
 function buildPDF(playerData, chartDataUrl) {
     const { jsPDF } = window.jspdf;
@@ -886,8 +918,7 @@ function buildPDF(playerData, chartDataUrl) {
         doc.setTextColor(0, 102, 204);
         doc.text(`Candidat : ${playerData.Candidat}`, 15, 50);
         
-        // NOUVEAU : Ajout du Code sur le PDF
-        doc.setTextColor(231, 76, 60); // Rouge
+        doc.setTextColor(231, 76, 60);
         doc.setFontSize(12);
         doc.text(`Code : ${playerData.PIN || "N/A"}`, 15, 58);
         
@@ -911,7 +942,7 @@ function buildPDF(playerData, chartDataUrl) {
         }
         
         doc.autoTable({
-            startY: 125, // Un peu plus bas pour faire place au Code Secret
+            startY: 125,
             head: [['Catégorie', 'Question Posée', 'Résultat', 'Bonne Réponse']],
             body: tableData,
             headStyles: { fillColor: [46, 204, 113] },
@@ -1025,12 +1056,10 @@ function buildPDF(playerData, chartDataUrl) {
 function generatePlayerPDF() {
     if(!resultsChartInstance) return alert("Graphique non disponible.");
     let chartUrl = resultsChartInstance.toBase64Image();
-    // On passe le playerPin actuel pour le PDF du joueur qui vient de finir
     let pData = { Candidat: playerName, "Score Points": scoreTotal, SessionDetails: playerSessionDetails, PIN: playerPin };
     buildPDF(pData, chartUrl);
 }
 
-// PLUS BESOIN de demander le mot de passe ici puisqu'on l'a déjà demandé dans openModal() !
 async function generateAdminPDF() {
     if(!currentViewingPlayerId || !modalChartInstance) return;
     try {
@@ -1050,7 +1079,7 @@ async function generateAdminPDF() {
 // EDITEUR DE QUESTIONS (ADMIN)
 // ==========================================
 async function openQuestionEditor() {
-    let pwd = await askPassword();
+    let pwd = await askPassword("⚠️ ZONE ADMINISTRATEUR ⚠️", "Veuillez entrer le mot de passe :");
     
     if (pwd === ADMIN_PASSWORD) { 
         renderEditorList(); 
@@ -1261,6 +1290,8 @@ document.addEventListener('keydown', function(e) {
             closeModal(); 
         } else if (editorModal.classList.contains('show')) { 
             closeEditor(); 
+        } else if (pwdModal.classList.contains('show')) {
+            // Géré par la modale
         } else if (activeScreen && (activeScreen.id === 'screen-game' || activeScreen.id === 'screen-intermediate')) { 
             cancelQuiz(); 
         } 
@@ -1268,6 +1299,10 @@ document.addEventListener('keydown', function(e) {
     
     // TOUCHE ENTRÉE (Actions contextuelles de confort)
     if (e.key === 'Enter') { 
+        if (pwdModal.classList.contains('show')) {
+            // Géré par la modale
+            return;
+        }
         if (activeScreen) { 
             if (activeScreen.id === 'screen-start' && document.activeElement.id === 'player-name') { 
                 startQuiz(); 
