@@ -13,7 +13,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
 
-    <link rel="stylesheet" href="style.css?v=14">
+    <link rel="stylesheet" href="style.css?v=15">
 </head>
 <body>
 
@@ -66,7 +66,7 @@
             <strong>Le saviez-vous ?</strong><br><br>
             <span id="trivia-text">Anecdote...</span>
         </div>
-        <button class="main-btn" onclick="goToNextQuestion()">Question suivante ➡️</button>
+        <button id="next-question-btn" class="main-btn" onclick="goToNextQuestion()">Question suivante ➡️</button>
     </div>
 
     <div id="screen-suspense" class="container hidden slide-in-right">
@@ -203,6 +203,6 @@
     </div>
 
     <script src="questions.js"></script>
-    <script type="module" src="script.js?v=14"></script>
+    <script type="module" src="script.js?v=15"></script>
 </body>
 </html>

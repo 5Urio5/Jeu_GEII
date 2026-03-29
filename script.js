@@ -110,7 +110,7 @@ function askPassword(customTitle = "⚠️ ZONE ADMINISTRATEUR ⚠️", customDe
         const submitBtn = document.getElementById('submit-pwd-btn');
         const cancelBtn = document.getElementById('cancel-pwd-btn');
         
-        // Configuration dynamique des textes de la modale
+        // Textes dynamiques pour masquer le terme administrateur aux joueurs
         titleEl.innerText = customTitle;
         descEl.innerText = customDesc;
         
@@ -139,7 +139,6 @@ function askPassword(customTitle = "⚠️ ZONE ADMINISTRATEUR ⚠️", customDe
 function togglePasswordVisibility() {
     const input = document.getElementById('admin-pwd-input');
     const toggleBtn = document.getElementById('toggle-pwd-btn');
-    
     if (input.type === 'password') { 
         input.type = 'text'; 
         toggleBtn.innerText = '🙈'; 
@@ -438,7 +437,7 @@ function processAnswer(selectedIndex, correctIndex, clickedBtn) {
         });
     }
     
-    // Enregistrement des détails de la question pour l'historique et le PDF
+    // Enregistrement des détails de la question
     playerSessionDetails.push({ 
         cat: qData.cat, 
         diff: qData.diff, 
@@ -490,6 +489,15 @@ function showIntermediateScreen(isCorrect, points, trivia, isTimeout) {
     }
     
     document.getElementById('trivia-text').innerText = trivia; 
+    
+    // CHANGEMENT DU BOUTON SI C'EST LA TOUTE DERNIÈRE QUESTION
+    let nextBtn = document.getElementById('next-question-btn');
+    if (currentQIndex === totalQuestions - 1) {
+        nextBtn.innerText = "Voir mon résultat ➡️";
+    } else {
+        nextBtn.innerText = "Question suivante ➡️";
+    }
+    
     slideTo('screen-intermediate');
 }
 
@@ -512,8 +520,6 @@ function goToNextQuestion() {
 // ==========================================
 // RÉSULTATS ET GRAPHIQUES RADAR
 // ==========================================
-
-// Le "Plugin" de Chart.js qui peint le fond en bleu nuit lors de la création du PDF
 const customCanvasBackgroundColor = {
     id: 'customCanvasBackgroundColor',
     beforeDraw: (chart, args, options) => {
@@ -551,7 +557,7 @@ function drawRadarChart(canvasId, dataArray, chartInstanceToUpdate) {
         chartInstanceToUpdate.destroy(); 
     }
     
-    // FUSION de la catégorie et du pourcentage pour éviter tout chevauchement (ex: AII : 85%)
+    // FUSION de la catégorie et du pourcentage
     const customLabels = [
         `AII : ${dataArray[0]}%`,
         `EME : ${dataArray[1]}%`,
@@ -577,10 +583,11 @@ function drawRadarChart(canvasId, dataArray, chartInstanceToUpdate) {
         plugins: [customCanvasBackgroundColor], 
         options: {
             animation: false,
+            responsive: true, // ✅ FORCE LE GRAPHIQUE À S'ADAPTER AU MOBILE
+            maintainAspectRatio: false, // ✅ OBLIGATOIRE POUR EMPÊCHER LE CANVAS DE DISPARAÎTRE
             layout: { padding: 15 },
             scales: {
                 r: { 
-                    // Verrouillage de l'échelle pour que le graphique soit toujours juste
                     min: 0,
                     max: 100,
                     angleLines: { color: 'rgba(255, 255, 255, 0.2)' }, 
@@ -641,9 +648,7 @@ async function showResults() {
                 } 
             }
         }
-    } catch(e) { 
-        console.error("Erreur classement", e); 
-    }
+    } catch(e) { console.error("Erreur classement", e); }
 
     let playerEmail = "";
     if (rank <= 3) {
@@ -725,7 +730,7 @@ async function openModal(playerId) {
         // --- SÉCURITÉ : Modale neutre pour l'utilisateur normal ---
         let pwd = await askPassword(
             "🔒 Accès Sécurisé", 
-            `Code d'accès de ${player.Candidat} :`
+            `Entrez le code d'accès de ${player.Candidat} :`
         );
         
         if (pwd !== ADMIN_PASSWORD && pwd !== player.PIN) {
@@ -790,11 +795,8 @@ function closeModal() {
 }
 
 async function toggleKeep(playerId, isChecked) { 
-    try { 
-        await set(ref(db, 'scores/' + playerId + '/keep'), isChecked); 
-    } catch (e) { 
-        console.error(e); 
-    } 
+    try { await set(ref(db, 'scores/' + playerId + '/keep'), isChecked); } 
+    catch (e) { console.error(e); } 
 }
 
 // FONCTION DE SUPPRESSION INDIVIDUELLE
@@ -820,9 +822,7 @@ async function resetPodium() {
                 await set(ref(db, 'scores'), null); 
                 alert("🗑️ Base de données réinitialisée !"); 
                 showPodium(); 
-            } catch (error) { 
-                alert("Erreur lors de la réinitialisation."); 
-            }
+            } catch (error) { alert("Erreur lors de la réinitialisation."); }
         }
     } else if (pwd !== null) { 
         alert("❌ Mot de passe incorrect."); 
@@ -981,7 +981,6 @@ function buildPDF(playerData, chartDataUrl) {
         // --- CONCLUSION, LIEN ET QR CODE ---
         let finalY = doc.lastAutoTable.finalY + 15;
 
-        // Saut de page de sécurité
         if (finalY > 220) { 
             doc.addPage(); 
             finalY = 20; 
@@ -1005,20 +1004,18 @@ function buildPDF(playerData, chartDataUrl) {
         let rejouerText = "Envie de rejouer ou de relever le défi entre amis ?";
         doc.text(rejouerText, 15, finalY + 28);
         
-        // Texte cliquable et souligné "Clique ici"
+        // Texte cliquable
         doc.setFont("helvetica", "bold");
         doc.setFontSize(10);
         doc.setTextColor(52, 152, 219); 
         let clickText = "Clique ici";
         doc.text(clickText, 15, finalY + 34);
 
-        // Tracé du soulignement bleu
         let textWidth = doc.getTextWidth(clickText);
         doc.setDrawColor(52, 152, 219);
         doc.setLineWidth(0.3);
         doc.line(15, finalY + 35, 15 + textWidth, finalY + 35);
 
-        // La zone cliquable invisible
         doc.link(15, finalY + 30, textWidth, 6, { url: 'https://5urio5.github.io/Jeu_GEII/' }); 
 
         // Suite de la phrase
@@ -1057,7 +1054,6 @@ function buildPDF(playerData, chartDataUrl) {
         canvas.getContext('2d').drawImage(imgLogo, 0, 0); 
         logoDataUrl = canvas.toDataURL('image/png');
         
-        // Calcul exact du ratio du logo
         let ratio = imgLogo.naturalWidth / imgLogo.naturalHeight;
         logoH = 18;
         logoW = 18 * ratio;
@@ -1088,7 +1084,6 @@ function generatePlayerPDF() {
     buildPDF(pData, chartUrl);
 }
 
-// Plus de sécurité demandée ici car c'est fait en amont lors de l'ouverture de la modale "Détails"
 async function generateAdminPDF() {
     if(!currentViewingPlayerId || !modalChartInstance) return;
     try {
