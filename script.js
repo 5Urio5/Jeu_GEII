@@ -99,7 +99,7 @@ let dynamicDB = [];
 let resultsChartInstance = null;
 let modalChartInstance = null;
 let currentViewingPlayerId = null; 
-let isManon = false; 
+let isDemoMode = false; // Mode triche (Simulation)
 
 async function loadQuestionsFromFirebase() {
     try {
@@ -275,7 +275,7 @@ function slideTo(screenId) {
 }
 
 function goToStart() {
-    isManon = false;
+    isDemoMode = false;
     setRandomBackground(); 
     resetIdleTimer(); 
     slideTo('screen-start');
@@ -293,43 +293,20 @@ function getRandom(arr, n) {
     return shuffled.slice(0, n); 
 }
 
-// Déclencheur du code triche Manon au clic sur le logo
-function triggerCheatCode() {
-    let code = prompt("🤫 Code secret administrateur :");
-    if (code && code.toLowerCase() === "manon") {
-        isManon = true;
+// 🔥 NOUVEAU DÉCLENCHEUR DÉMO (EASTER EGG) 🔥
+async function triggerCheatCode() {
+    let pwd = await askPassword("🤫 MODE DÉMO", "Entrez le mot de passe administrateur :");
+    if (pwd === ADMIN_PASSWORD) {
+        isDemoMode = true;
         startQuiz();
+    } else if (pwd !== null) {
+        alert("❌ Mot de passe incorrect.");
     }
 }
 
 async function startQuiz() {
     if (!audioCtx) audioCtx = new AudioContextClass(); 
     if (audioCtx.state === 'suspended') audioCtx.resume();
-
-    // 🔥 GESTION DU CHEAT CODE "MANON" 🔥
-    if (isManon) {
-        playerName = "Manon (Démo)";
-        scoresCount = {AII: 5, EME: 7, ESE: 6}; 
-        scoresPoints = {AII: 4433, EME: 6451, ESE: 5567}; 
-        scoreTotal = 16451; 
-        
-        playerSessionDetails = [];
-        for(let i = 0; i < 30; i++) {
-            let fakeCat = i < 10 ? "AII" : (i < 20 ? "EME" : "ESE");
-            playerSessionDetails.push({
-                cat: fakeCat, diff: "BU2", q: `Question masquée ${i+1} (Mode Démo)`, 
-                isCorrect: true, time: 1.5, points: 1850, correctAnsText: "Réponse parfaite !"
-            });
-        }
-        
-        slideTo('screen-suspense'); 
-        playSound('drumroll'); 
-        setTimeout(async () => { 
-            document.getElementById('cp-player-name').innerText = playerName;
-            slideTo('screen-create-password'); 
-        }, 3000);
-        return; 
-    }
 
     // 🔒 TRANSACTION FIREBASE : Génération du Numéro Séquentiel (Player0001, Player0002...)
     const countRef = ref(db, 'metadata/playerCount');
@@ -345,6 +322,7 @@ async function startQuiz() {
         newPlayerId = Math.floor(1000 + Math.random() * 9000); 
     }
 
+    // Le pseudo de base devient PlayerXXXX
     playerName = "Player" + newPlayerId.toString().padStart(4, '0'); 
     
     // Initialisation
@@ -368,7 +346,61 @@ async function startQuiz() {
     });
     currentQuestions = selected.sort(() => 0.5 - Math.random());
     
-    // Génération de la barre de progression
+    // 🔥 GESTION DE LA SIMULATION (MODE DÉMO) 🔥
+    if (isDemoMode) {
+        isDemoMode = false; // On reset
+        
+        // On simule 29 questions instantanément
+        for(let i = 0; i < 29; i++) {
+            let q = currentQuestions[i];
+            let isCorrect = Math.random() > 0.3; // 70% de chance d'avoir juste
+            let timeTaken = Math.floor(Math.random() * 15) + 2; // Temps aléatoire entre 2 et 16 sec
+            let timeLeftSim = timeLimit - timeTaken;
+            
+            let basePoints = Math.round((timeLeftSim / timeLimit) * 500) + 500;
+            let coef = DIFF_WEIGHTS[q.diff] || 1;
+            let pointsGained = isCorrect ? Math.round(basePoints * coef) : 0;
+            
+            if(isCorrect) {
+                scoresCount[q.cat]++;
+                scoresPoints[q.cat] += pointsGained;
+                scoreTotal += pointsGained;
+                currentStreak++;
+            } else {
+                currentStreak = 0;
+            }
+            
+            playerSessionDetails.push({
+                cat: q.cat, diff: q.diff, q: q.q,
+                isCorrect: isCorrect, time: timeTaken, points: pointsGained,
+                correctAnsText: q.opt[q.ans]
+            });
+        }
+        
+        // On place l'index sur la toute dernière question !
+        currentQIndex = 29;
+        
+        // On remplit visuellement la jauge avec les succès/échecs des 29 questions
+        let progContainer = document.getElementById('progress-container'); 
+        progContainer.innerHTML = '';
+        for(let i=0; i<30; i++) { 
+            let box = document.createElement('div');
+            box.className = 'progress-box';
+            box.id = `box-${i}`;
+            if (i < 29) {
+                if (playerSessionDetails[i].isCorrect) box.classList.add('prog-correct');
+                else box.classList.add('prog-wrong');
+            }
+            progContainer.appendChild(box);
+        }
+        
+        document.getElementById('player-display').innerHTML = `👤 ${playerName} (Démo) <span style="margin-left:20px; color:#f1c40f;" id="live-score">${scoreTotal} pts</span>`;
+        slideTo('screen-game'); 
+        loadQuestion();
+        return; 
+    }
+
+    // Lancement normal
     let progContainer = document.getElementById('progress-container'); 
     progContainer.innerHTML = '';
     for(let i=0; i<30; i++) { 
@@ -461,7 +493,6 @@ function processAnswer(selectedIndex, correctIndex, clickedBtn) {
         if(clickedBtn) clickedBtn.classList.add('btn-correct'); 
         box.classList.add('prog-correct');
         
-        // Calcul des points basé sur les coefficients définis
         let basePoints = Math.round((timeLeft / timeLimit) * 500) + 500;
         let coef = DIFF_WEIGHTS[qData.diff] || 1;
         pointsGained = Math.round(basePoints * coef);
@@ -530,6 +561,7 @@ function showIntermediateScreen(isCorrect, points, trivia, isTimeout) {
     
     document.getElementById('trivia-text').innerText = trivia; 
     
+    // Le bouton de la toute dernière question
     let nextBtn = document.getElementById('next-question-btn');
     if (currentQIndex === totalQuestions - 1) {
         nextBtn.innerText = "Voir mon résultat ➡️";
@@ -550,7 +582,7 @@ function goToNextQuestion() {
         slideTo('screen-suspense'); 
         playSound('drumroll'); 
         setTimeout(async () => { 
-            // On a fini le suspense, on passe à l'écran de création du mot de passe !
+            // Fin du suspense -> Création du Mot de Passe
             document.getElementById('cp-player-name').innerText = playerName;
             document.getElementById('new-player-pin').value = '';
             slideTo('screen-create-password');
@@ -657,7 +689,7 @@ function drawRadarChart(canvasId, dataArray, chartInstanceToUpdate) {
     });
 }
 
-// 🔥 FONCTION CORRIGÉE ET NETTOYÉE (Plus de demande d'email inutile) 🔥
+// Totalement nettoyé de la relique de l'e-mail !
 async function showResultsFinal() {
     resetIdleTimer();
     
@@ -805,7 +837,6 @@ async function openModal(playerId) {
             }
         });
 
-        // En-tête Flexbox avec Crayon d'édition et Changement de MDP
         document.getElementById('modal-header-content').innerHTML = `
             <h2 style="color:#f1c40f; margin:0; font-size:1.6em;">
                 Analyse de : <span id="detail-pseudo-display">${player.Candidat}</span> 
@@ -1019,6 +1050,7 @@ function buildPDF(playerData, chartDataUrl) {
         doc.setFontSize(20);
         doc.text("BILAN DE COMPÉTENCES GEII", 105, 38, {align: "center"});
         
+        // Infos Joueur
         doc.setFontSize(14); 
         doc.setTextColor(0, 102, 204);
         doc.text(`Identifiant : ${playerData.Candidat}`, 15, 50);

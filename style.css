@@ -243,7 +243,7 @@ th, td { padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.2); vert
     .logo-container { margin-top: 0; padding: 10px 20px; }
     h1 { font-size: 2.2em; }
 
-    /* Correction En-tête : Force le score sous le pseudo, et empeche "pts" de se couper */
+    /* Correction En-tête : Force le score sous le pseudo */
     #player-display {
         display: flex;
         flex-direction: column;
