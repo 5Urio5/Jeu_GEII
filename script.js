@@ -3,7 +3,6 @@
 // ==========================================
 // 🔒 SÉCURITÉ ET CONFIGURATION (MODIFIABLES)
 // ==========================================
-// Tu peux changer ces valeurs très facilement ici !
 const ADMIN_PASSWORD = "iutgeii"; 
 
 // Coefficients de difficulté appliqués aux points
@@ -99,7 +98,10 @@ let dynamicDB = [];
 let resultsChartInstance = null;
 let modalChartInstance = null;
 let currentViewingPlayerId = null; 
-let isDemoMode = false; // Mode triche (Simulation)
+let isDemoMode = false; 
+
+// 🔥 NOUVEAU : On sauvegarde le numéro attribué pour pouvoir le libérer s'il quitte
+let currentAssignedNum = null; 
 
 async function loadQuestionsFromFirebase() {
     try {
@@ -281,9 +283,17 @@ function goToStart() {
     slideTo('screen-start');
 }
 
-function cancelQuiz() {
+async function cancelQuiz() {
     if (confirm("⚠️ Es-tu sûr de vouloir annuler la partie en cours ?\n\nTa progression ne sera pas sauvegardée et n'apparaîtra pas dans le classement. Tu perdras tout.")) {
         clearInterval(timerInterval); 
+        
+        // 🔥 Si le joueur annule sa partie, on libère le numéro de joueur généré !
+        if (currentAssignedNum !== null) {
+            try { await set(ref(db, `metadata/usedIds/${currentAssignedNum}`), null); } 
+            catch(e) {}
+            currentAssignedNum = null;
+        }
+        
         goToStart();
     }
 }
@@ -293,7 +303,7 @@ function getRandom(arr, n) {
     return shuffled.slice(0, n); 
 }
 
-// 🔥 NOUVEAU DÉCLENCHEUR DÉMO (EASTER EGG) 🔥
+// DÉCLENCHEUR DÉMO (EASTER EGG)
 async function triggerCheatCode() {
     let pwd = await askPassword("🤫 MODE DÉMO", "Entrez le mot de passe administrateur :");
     if (pwd === ADMIN_PASSWORD) {
@@ -308,32 +318,15 @@ async function startQuiz() {
     if (!audioCtx) audioCtx = new AudioContextClass(); 
     if (audioCtx.state === 'suspended') audioCtx.resume();
 
-    // 🔒 TRANSACTION FIREBASE : Génération du Numéro Séquentiel (Player0001, Player0002...)
-    const countRef = ref(db, 'metadata/playerCount');
-    let newPlayerId = 1;
-    
-    try {
-        const result = await runTransaction(countRef, (currentData) => {
-            return (currentData || 0) + 1;
-        });
-        newPlayerId = result.snapshot.val();
-    } catch (error) {
-        console.error("Échec de la transaction séquentielle, utilisation de l'aléatoire en secours.", error);
-        newPlayerId = Math.floor(1000 + Math.random() * 9000); 
-    }
-
-    // Le pseudo de base devient PlayerXXXX
-    playerName = "Player" + newPlayerId.toString().padStart(4, '0'); 
-    
     // Initialisation
     playerPin = ""; 
     scoresPoints = {AII: 0, EME: 0, ESE: 0}; 
     scoresCount = {AII: 0, EME: 0, ESE: 0};
     scoreTotal = 0; 
     currentStreak = 0; 
-    currentQIndex = 0; 
     playerSessionDetails = [];
-    
+    currentAssignedNum = null;
+
     // Mixage des questions depuis la base de données dynamique
     let selected = [];
     ['AII', 'EME', 'ESE'].forEach(cat => {
@@ -345,16 +338,17 @@ async function startQuiz() {
         selected = selected.concat(qCom, qSTI, qBU1, qBU2);
     });
     currentQuestions = selected.sort(() => 0.5 - Math.random());
-    
-    // 🔥 GESTION DE LA SIMULATION (MODE DÉMO) 🔥
+
+    // 🔥 GESTION DE LA SIMULATION (MODE DÉMO EXACT) 🔥
     if (isDemoMode) {
-        isDemoMode = false; // On reset
+        isDemoMode = false; 
+        playerName = "PlayerManon (Démo)";
         
-        // On simule 29 questions instantanément
+        // On simule 29 questions instantanément pour te laisser la 30ème !
         for(let i = 0; i < 29; i++) {
             let q = currentQuestions[i];
             let isCorrect = Math.random() > 0.3; // 70% de chance d'avoir juste
-            let timeTaken = Math.floor(Math.random() * 15) + 2; // Temps aléatoire entre 2 et 16 sec
+            let timeTaken = Math.floor(Math.random() * 15) + 2; 
             let timeLeftSim = timeLimit - timeTaken;
             
             let basePoints = Math.round((timeLeftSim / timeLimit) * 500) + 500;
@@ -377,10 +371,9 @@ async function startQuiz() {
             });
         }
         
-        // On place l'index sur la toute dernière question !
-        currentQIndex = 29;
+        currentQIndex = 29; // On se place directement sur la 30ème question (Index 29)
         
-        // On remplit visuellement la jauge avec les succès/échecs des 29 questions
+        // On remplit visuellement la jauge des 29 questions précédentes
         let progContainer = document.getElementById('progress-container'); 
         progContainer.innerHTML = '';
         for(let i=0; i<30; i++) { 
@@ -394,13 +387,34 @@ async function startQuiz() {
             progContainer.appendChild(box);
         }
         
-        document.getElementById('player-display').innerHTML = `👤 ${playerName} (Démo) <span style="margin-left:20px; color:#f1c40f;" id="live-score">${scoreTotal} pts</span>`;
+        document.getElementById('player-display').innerHTML = `👤 ${playerName} <span style="margin-left:20px; color:#f1c40f;" id="live-score">${scoreTotal} pts</span>`;
         slideTo('screen-game'); 
-        loadQuestion();
+        loadQuestion(); // On lance la dernière question
         return; 
     }
 
-    // Lancement normal
+    // 🔒 TRANSACTION FIREBASE : L'Algorithme qui comble les trous (1, 2, 4 -> donne 3)
+    const idsRef = ref(db, 'metadata/usedIds');
+    try {
+        await runTransaction(idsRef, (currentData) => {
+            let data = currentData || {};
+            let id = 1;
+            // On cherche le plus petit ID disponible
+            while (data[id.toString()]) {
+                id++;
+            }
+            data[id.toString()] = true; // On réserve ce numéro
+            currentAssignedNum = id; // On l'enregistre localement
+            return data;
+        });
+    } catch (error) {
+        console.error("Échec de la transaction d'ID", error);
+        currentAssignedNum = Math.floor(1000 + Math.random() * 9000); 
+    }
+
+    playerName = "Player" + currentAssignedNum.toString().padStart(4, '0'); 
+    currentQIndex = 0;
+    
     let progContainer = document.getElementById('progress-container'); 
     progContainer.innerHTML = '';
     for(let i=0; i<30; i++) { 
@@ -561,7 +575,6 @@ function showIntermediateScreen(isCorrect, points, trivia, isTimeout) {
     
     document.getElementById('trivia-text').innerText = trivia; 
     
-    // Le bouton de la toute dernière question
     let nextBtn = document.getElementById('next-question-btn');
     if (currentQIndex === totalQuestions - 1) {
         nextBtn.innerText = "Voir mon résultat ➡️";
@@ -689,7 +702,6 @@ function drawRadarChart(canvasId, dataArray, chartInstanceToUpdate) {
     });
 }
 
-// Totalement nettoyé de la relique de l'e-mail !
 async function showResultsFinal() {
     resetIdleTimer();
     
@@ -720,14 +732,15 @@ async function showResultsFinal() {
     let radarData = calculateRadarData(playerSessionDetails);
     resultsChartInstance = drawRadarChart('results-chart', radarData, resultsChartInstance);
 
-    // Sauvegarde Finale dans Firebase
-    saveScoreFirebase(playerName, scoreTotal, bestCat, playerPin);
+    // Sauvegarde Finale dans Firebase (inclut le PlayerNum pour le libérer plus tard si besoin)
+    saveScoreFirebase(playerName, scoreTotal, bestCat, playerPin, currentAssignedNum);
     slideTo('screen-results');
 }
 
-function saveScoreFirebase(name, totalScore, profil, pin) {
+function saveScoreFirebase(name, totalScore, profil, pin, pNum) {
     push(ref(db, 'scores'), { 
         "Candidat": name, 
+        "playerNum": pNum, // Garde la trace du numéro original
         "Score Points": totalScore, 
         "Profil": profil, 
         "ScoresCount": scoresCount, 
@@ -911,9 +924,28 @@ async function toggleKeep(playerId, isChecked) {
     catch (e) { console.error(e); } 
 }
 
+// 🔥 NOUVEAU : Supprime le joueur ET libère son numéro original 🔥
 async function deletePlayerScore(playerId) {
     if (confirm("⚠️ Voulez-vous vraiment supprimer ce joueur de la base de données ? Action irréversible.")) {
         try {
+            const snap = await get(ref(db, `scores/${playerId}`));
+            if (snap.exists()) {
+                let p = snap.val();
+                let numToFree = p.playerNum; // On récupère son vrai numéro de création
+                
+                // Sécurité : Si c'est un vieux score d'avant la mise à jour
+                if (!numToFree) {
+                    let match = p.Candidat.match(/^Player(\d{4})$/i);
+                    if (match) numToFree = parseInt(match[1], 10);
+                }
+                
+                // On libère ce numéro pour le prochain
+                if (numToFree) {
+                    await set(ref(db, `metadata/usedIds/${numToFree}`), null);
+                }
+            }
+            
+            // On supprime la ligne du score
             await set(ref(db, 'scores/' + playerId), null);
             closeModal();
             showPodium(); 
@@ -931,6 +963,7 @@ async function resetPodium() {
         if (confirm("⚠️ Voulez-vous vraiment effacer TOUS les scores ? Action irréversible.")) {
             try { 
                 await set(ref(db, 'scores'), null); 
+                await set(ref(db, 'metadata/usedIds'), null); // Purge aussi les numéros
                 alert("🗑️ Base de données réinitialisée !"); 
                 showPodium(); 
             } catch (error) { alert("Erreur lors de la réinitialisation."); }
@@ -1050,7 +1083,6 @@ function buildPDF(playerData, chartDataUrl) {
         doc.setFontSize(20);
         doc.text("BILAN DE COMPÉTENCES GEII", 105, 38, {align: "center"});
         
-        // Infos Joueur
         doc.setFontSize(14); 
         doc.setTextColor(0, 102, 204);
         doc.text(`Identifiant : ${playerData.Candidat}`, 15, 50);
@@ -1430,7 +1462,7 @@ document.addEventListener('keydown', function(e) {
             } else if (activeScreen.id === 'screen-intermediate') { 
                 goToNextQuestion(); 
             } else if (activeScreen.id === 'screen-results') { 
-                goToStart(); 
+                showPodium(); 
             } 
         } 
     }
