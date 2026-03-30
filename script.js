@@ -3,7 +3,8 @@
 // ==========================================
 // 🔒 SÉCURITÉ ET CONFIGURATION (MODIFIABLES)
 // ==========================================
-const ADMIN_PASSWORD = "iutgeii";
+// Tu peux changer ces valeurs très facilement ici !
+const ADMIN_PASSWORD = "iutgeii"; 
 
 // Coefficients de difficulté appliqués aux points
 const DIFF_WEIGHTS = { 
@@ -26,7 +27,7 @@ const DIFF_LABELS = {
 // ==========================================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-analytics.js";
-import { getDatabase, ref, push, get, set } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js";
+import { getDatabase, ref, push, get, set, runTransaction } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyA5xccoSduwPvhrnR769i_2Fhp9zW63C5M",
@@ -69,6 +70,11 @@ window.editQuestion = editQuestion;
 window.saveQuestion = saveQuestion; 
 window.deleteQuestion = deleteQuestion;
 window.resetQuestionsToDefault = resetQuestionsToDefault;
+window.triggerCheatCode = triggerCheatCode;
+window.submitNewPassword = submitNewPassword;
+window.filterPodium = filterPodium;
+window.editPseudo = editPseudo;
+window.changePlayerPassword = changePlayerPassword;
 
 // ==========================================
 // VARIABLES GLOBALES & CHARGEMENT
@@ -93,6 +99,7 @@ let dynamicDB = [];
 let resultsChartInstance = null;
 let modalChartInstance = null;
 let currentViewingPlayerId = null; 
+let isManon = false; 
 
 async function loadQuestionsFromFirebase() {
     try {
@@ -268,7 +275,7 @@ function slideTo(screenId) {
 }
 
 function goToStart() {
-    document.getElementById('player-name').value = ''; 
+    isManon = false;
     setRandomBackground(); 
     resetIdleTimer(); 
     slideTo('screen-start');
@@ -286,19 +293,22 @@ function getRandom(arr, n) {
     return shuffled.slice(0, n); 
 }
 
+// Déclencheur du code triche Manon au clic sur le logo
+function triggerCheatCode() {
+    let code = prompt("🤫 Code secret administrateur :");
+    if (code && code.toLowerCase() === "manon") {
+        isManon = true;
+        startQuiz();
+    }
+}
+
 async function startQuiz() {
-    let rawName = document.getElementById('player-name').value.trim();
-    if (!rawName) return alert("Hé ! N'oublie pas de taper ton prénom !");
-    
-    let safeName = sanitizeString(rawName); 
-    document.getElementById('player-name').blur(); 
-    
     if (!audioCtx) audioCtx = new AudioContextClass(); 
     if (audioCtx.state === 'suspended') audioCtx.resume();
 
-    // 🔥 LE CHEAT CODE "MANON" EST LÀ 🔥
-    if (safeName.toLowerCase() === "manon") {
-        playerName = "Manon";
+    // 🔥 GESTION DU CHEAT CODE "MANON" 🔥
+    if (isManon) {
+        playerName = "Manon (Démo)";
         scoresCount = {AII: 5, EME: 7, ESE: 6}; 
         scoresPoints = {AII: 4433, EME: 6451, ESE: 5567}; 
         scoreTotal = 16451; 
@@ -315,25 +325,29 @@ async function startQuiz() {
         slideTo('screen-suspense'); 
         playSound('drumroll'); 
         setTimeout(async () => { 
-            await showResults(); 
-            window.confetti({ particleCount: 150, spread: 100, origin: { y: 0.6 }, zIndex: 10000 }); 
+            document.getElementById('cp-player-name').innerText = playerName;
+            slideTo('screen-create-password'); 
         }, 3000);
         return; 
     }
 
+    // 🔒 TRANSACTION FIREBASE : Génération du Numéro Séquentiel (Player0001, Player0002...)
+    const countRef = ref(db, 'metadata/playerCount');
+    let newPlayerId = 1;
+    
     try {
-        const snapshot = await get(ref(db, 'scores'));
-        if (snapshot.exists()) {
-            const scoresObj = snapshot.val();
-            for (let key in scoresObj) {
-                if (scoresObj[key].Candidat.toLowerCase() === safeName.toLowerCase()) {
-                    return alert("⚠️ Ce prénom est déjà pris sur le classement !\n\nEssaie de rajouter l'initiale de ton nom de famille (ex: " + safeName + " D).");
-                }
-            }
-        }
-    } catch(e) { console.error(e); }
+        const result = await runTransaction(countRef, (currentData) => {
+            return (currentData || 0) + 1;
+        });
+        newPlayerId = result.snapshot.val();
+    } catch (error) {
+        console.error("Échec de la transaction séquentielle, utilisation de l'aléatoire en secours.", error);
+        newPlayerId = Math.floor(1000 + Math.random() * 9000); 
+    }
 
-    playerName = safeName; 
+    playerName = "Player" + newPlayerId.toString().padStart(4, '0'); 
+    
+    // Initialisation
     playerPin = ""; 
     scoresPoints = {AII: 0, EME: 0, ESE: 0}; 
     scoresCount = {AII: 0, EME: 0, ESE: 0};
@@ -342,6 +356,7 @@ async function startQuiz() {
     currentQIndex = 0; 
     playerSessionDetails = [];
     
+    // Mixage des questions depuis la base de données dynamique
     let selected = [];
     ['AII', 'EME', 'ESE'].forEach(cat => {
         let catQ = dynamicDB.filter(q => q.cat === cat);
@@ -353,9 +368,9 @@ async function startQuiz() {
     });
     currentQuestions = selected.sort(() => 0.5 - Math.random());
     
+    // Génération de la barre de progression
     let progContainer = document.getElementById('progress-container'); 
     progContainer.innerHTML = '';
-    
     for(let i=0; i<30; i++) { 
         progContainer.innerHTML += `<div class="progress-box" id="box-${i}"></div>`; 
     }
@@ -378,8 +393,6 @@ function loadQuestion() {
 
     let qData = currentQuestions[currentQIndex];
     let diffClass = "diff-" + qData.diff;
-    
-    // Application de la traduction (ex: "Com" -> "CG")
     let displayDiff = DIFF_LABELS[qData.diff] || qData.diff;
     
     let qBox = document.getElementById('question-text');
@@ -388,7 +401,7 @@ function loadQuestion() {
     
     let badge = document.createElement('span');
     badge.className = `diff-badge ${diffClass}`;
-    badge.innerText = displayDiff; // Affichage du nouveau label
+    badge.innerText = displayDiff; 
     qBox.appendChild(badge);
     
     qBox.appendChild(document.createTextNode(` : `));
@@ -448,7 +461,7 @@ function processAnswer(selectedIndex, correctIndex, clickedBtn) {
         if(clickedBtn) clickedBtn.classList.add('btn-correct'); 
         box.classList.add('prog-correct');
         
-        // Calcul des points basé sur le nouveau système de variables
+        // Calcul des points basé sur les coefficients définis
         let basePoints = Math.round((timeLeft / timeLimit) * 500) + 500;
         let coef = DIFF_WEIGHTS[qData.diff] || 1;
         pointsGained = Math.round(basePoints * coef);
@@ -517,7 +530,6 @@ function showIntermediateScreen(isCorrect, points, trivia, isTimeout) {
     
     document.getElementById('trivia-text').innerText = trivia; 
     
-    // Changement du bouton si c'est la toute dernière question
     let nextBtn = document.getElementById('next-question-btn');
     if (currentQIndex === totalQuestions - 1) {
         nextBtn.innerText = "Voir mon résultat ➡️";
@@ -538,15 +550,28 @@ function goToNextQuestion() {
         slideTo('screen-suspense'); 
         playSound('drumroll'); 
         setTimeout(async () => { 
-            await showResults(); 
-            window.confetti({ particleCount: 150, spread: 100, origin: { y: 0.6 }, zIndex: 10000 }); 
+            // On a fini le suspense, on passe à l'écran de création du mot de passe !
+            document.getElementById('cp-player-name').innerText = playerName;
+            document.getElementById('new-player-pin').value = '';
+            slideTo('screen-create-password');
         }, 3000); 
     }
 }
 
 // ==========================================
-// RÉSULTATS ET GRAPHIQUES RADAR
+// CRÉATION MOT DE PASSE ET RÉSULTATS
 // ==========================================
+
+async function submitNewPassword() {
+    let pinInput = document.getElementById('new-player-pin').value.trim();
+    if (!pinInput) return alert("Hé ! Tu dois créer un mot de passe pour protéger tes résultats !");
+    
+    playerPin = sanitizeString(pinInput); 
+    
+    window.confetti({ particleCount: 150, spread: 100, origin: { y: 0.6 }, zIndex: 10000 }); 
+    await showResultsFinal();
+}
+
 const customCanvasBackgroundColor = {
     id: 'customCanvasBackgroundColor',
     beforeDraw: (chart, args, options) => {
@@ -564,7 +589,7 @@ function calculateRadarData(sessionDetails) {
     
     sessionDetails.forEach(q => {
         let w = DIFF_WEIGHTS[q.diff] || 1; 
-        let maxQPoints = 1000 * w; // Le max théorique est toujours de 1000 * coeff
+        let maxQPoints = 1000 * w; 
         
         if(stats[q.cat]) {
             stats[q.cat].maxPts += maxQPoints;
@@ -632,10 +657,9 @@ function drawRadarChart(canvasId, dataArray, chartInstanceToUpdate) {
     });
 }
 
-async function showResults() {
+// 🔥 FONCTION CORRIGÉE ET NETTOYÉE (Plus de demande d'email inutile) 🔥
+async function showResultsFinal() {
     resetIdleTimer();
-    
-    playerPin = Math.floor(1000 + Math.random() * 9000).toString();
     
     let htmlScores = ""; 
     let bestCat = ""; 
@@ -657,37 +681,19 @@ async function showResults() {
     }
     
     document.getElementById('final-score').innerText = `Score Final : ${scoreTotal} pts`;
-    document.getElementById('player-pin-display').innerText = `Code d'accès : ${playerPin}`;
+    document.getElementById('results-player-name').innerText = playerName; 
     document.getElementById('scores-display').innerHTML = htmlScores;
     document.getElementById('best-path').innerText = `👉 PARCOURS CONSEILLÉ : ${bestCat} 👈`;
 
     let radarData = calculateRadarData(playerSessionDetails);
     resultsChartInstance = drawRadarChart('results-chart', radarData, resultsChartInstance);
 
-    let rank = 1;
-    try {
-        const snapshot = await get(ref(db, 'scores'));
-        if (snapshot.exists()) {
-            const scoresObj = snapshot.val();
-            for (let key in scoresObj) { 
-                if (scoresObj[key]["Score Points"] > scoreTotal) { 
-                    rank++; 
-                } 
-            }
-        }
-    } catch(e) { console.error("Erreur classement", e); }
-
-    let playerEmail = "";
-    if (rank <= 3) {
-        let emailPrompt = prompt(`🎉 INCROYABLE ! Tu te hisses à la place #${rank} du classement mondial !\n\nLaisse-nous ton adresse e-mail pour que l'on puisse te recontacter si tu restes sur le podium :`);
-        if (emailPrompt) playerEmail = sanitizeString(emailPrompt.trim());
-    }
-
-    saveScoreFirebase(playerName, scoreTotal, bestCat, playerEmail, playerPin);
+    // Sauvegarde Finale dans Firebase
+    saveScoreFirebase(playerName, scoreTotal, bestCat, playerPin);
     slideTo('screen-results');
 }
 
-function saveScoreFirebase(name, totalScore, profil, email, pin) {
+function saveScoreFirebase(name, totalScore, profil, pin) {
     push(ref(db, 'scores'), { 
         "Candidat": name, 
         "Score Points": totalScore, 
@@ -696,7 +702,6 @@ function saveScoreFirebase(name, totalScore, profil, email, pin) {
         "ScoresPoints": scoresPoints, 
         "SessionDetails": playerSessionDetails, 
         "keep": false, 
-        "Email": email || "",
         "PIN": pin || "" 
     });
 }
@@ -707,6 +712,8 @@ function saveScoreFirebase(name, totalScore, profil, email, pin) {
 async function showPodium() {
     resetIdleTimer(); 
     slideTo('screen-podium'); 
+    
+    document.getElementById('search-podium').value = ''; 
     
     let tbody = document.getElementById('podium-body'); 
     tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#bdc3c7;">Chargement <div class="spinner"></div></td></tr>';
@@ -745,6 +752,22 @@ async function showPodium() {
     }
 }
 
+function filterPodium() {
+    let input = document.getElementById('search-podium').value.toLowerCase();
+    let rows = document.querySelectorAll('#podium-body tr');
+    
+    rows.forEach(row => {
+        if (row.cells.length > 1) { 
+            let name = row.cells[1].innerText.toLowerCase();
+            if (name.includes(input)) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        }
+    });
+}
+
 async function openModal(playerId) {
     try {
         const snapshot = await get(ref(db, 'scores')); 
@@ -756,11 +779,11 @@ async function openModal(playerId) {
         
         let pwd = await askPassword(
             "🔒 Accès Sécurisé", 
-            `Entrez le code d'accès de ${player.Candidat} :`
+            `Pour voir les détails, entre le mot de passe de ${player.Candidat} :`
         );
         
         if (pwd !== ADMIN_PASSWORD && pwd !== player.PIN) {
-            if (pwd !== null) alert("❌ Code incorrect.");
+            if (pwd !== null) alert("❌ Mot de passe incorrect.");
             return; 
         }
 
@@ -782,11 +805,15 @@ async function openModal(playerId) {
             }
         });
 
-        let safePin = player.PIN || "Aucun";
+        // En-tête Flexbox avec Crayon d'édition et Changement de MDP
         document.getElementById('modal-header-content').innerHTML = `
-            <h2 style="color:#f1c40f; margin:0; font-size:1.6em;">Analyse de : ${player.Candidat}<br><span style="font-size:0.7em; color:#bdc3c7;">Code : ${safePin}</span></h2>
+            <h2 style="color:#f1c40f; margin:0; font-size:1.6em;">
+                Analyse de : <span id="detail-pseudo-display">${player.Candidat}</span> 
+                <span style="cursor:pointer;" onclick="editPseudo('${player.id}')" title="Modifier le pseudo">✏️</span>
+            </h2>
             <div class="modal-header-actions">
                 <label class="keep-label"><input type="checkbox" onchange="toggleKeep('${player.id}', this.checked)" ${player.keep ? "checked" : ""}> 📌 Conserver</label>
+                <button class="secondary-btn" style="background:#8e44ad; padding:6px 12px; font-size:0.85em; margin:0;" onclick="changePlayerPassword('${player.id}')">🔑 Changer MDP</button>
                 <button class="delete-player-btn" onclick="deletePlayerScore('${player.id}')">🗑️ Supprimer</button>
             </div>`;
 
@@ -798,7 +825,6 @@ async function openModal(playerId) {
                 let resIcon = q.isCorrect ? `<span class="correct-cell">✅</span>` : `<span class="incorrect-cell">❌</span>`;
                 let successRate = (globalStats[q.q] && globalStats[q.q].asked > 0) ? Math.round((globalStats[q.q].correct / globalStats[q.q].asked) * 100) + "%" : "-";
                 
-                // Intégration de la pastille de couleur traduite dans l'onglet détail
                 let displayDiff = DIFF_LABELS[q.diff] || q.diff || '-';
                 let badgeHtml = `<span class="diff-badge diff-${q.diff || 'Com'}">${displayDiff}</span>`;
                 
@@ -816,6 +842,32 @@ async function openModal(playerId) {
         document.getElementById('details-modal').classList.add('show');
     } catch (error) { 
         console.error(error); 
+    }
+}
+
+async function editPseudo(playerId) {
+    let newName = prompt("Choisis ton nouveau pseudonyme pour apparaître sur le podium (laisser vide pour annuler) :");
+    if (newName && newName.trim() !== "") {
+        let cleanName = sanitizeString(newName.trim());
+        try {
+            await set(ref(db, `scores/${playerId}/Candidat`), cleanName);
+            document.getElementById('detail-pseudo-display').innerText = cleanName;
+            showPodium(); 
+        } catch(e) {
+            alert("Erreur lors de la modification.");
+        }
+    }
+}
+
+async function changePlayerPassword(playerId) {
+    let newPin = prompt("Entrez le nouveau mot de passe pour ce compte :");
+    if (newPin && newPin.trim() !== "") {
+        try {
+            await set(ref(db, `scores/${playerId}/PIN`), sanitizeString(newPin.trim()));
+            alert("Mot de passe mis à jour avec succès !");
+        } catch(e) {
+            alert("Erreur lors de la modification.");
+        }
     }
 }
 
@@ -887,7 +939,6 @@ async function downloadExcel() {
                     "Bonnes Rép. AII": p.ScoresCount ? p.ScoresCount.AII : 0, 
                     "Bonnes Rép. EME": p.ScoresCount ? p.ScoresCount.EME : 0, 
                     "Bonnes Rép. ESE": p.ScoresCount ? p.ScoresCount.ESE : 0, 
-                    "Email Contact": p.Email || "", 
                     "Conserver": p.keep ? "OUI" : "NON" 
                 });
                 
@@ -897,7 +948,7 @@ async function downloadExcel() {
                             "Candidat": p.Candidat, 
                             "Num": index + 1, 
                             "Catégorie": q.cat, 
-                            "Diff": DIFF_LABELS[q.diff] || q.diff || '-', // Traduction dans le fichier Excel
+                            "Diff": DIFF_LABELS[q.diff] || q.diff || '-', 
                             "Question": q.q, 
                             "Résultat": q.isCorrect ? "VRAI" : "FAUX", 
                             "Temps (s)": q.time, 
@@ -970,17 +1021,14 @@ function buildPDF(playerData, chartDataUrl) {
         
         doc.setFontSize(14); 
         doc.setTextColor(0, 102, 204);
-        doc.text(`Candidat : ${playerData.Candidat}`, 15, 50);
-        
-        doc.setTextColor(231, 76, 60);
-        doc.setFontSize(12);
-        doc.text(`Code : ${playerData.PIN || "N/A"}`, 15, 58);
+        doc.text(`Identifiant : ${playerData.Candidat}`, 15, 50);
         
         doc.setTextColor(0, 0, 0); 
-        doc.text(`Score Final : ${playerData["Score Points"] || scoreTotal} pts`, 15, 66);
+        doc.setFontSize(12);
+        doc.text(`Score Final : ${playerData["Score Points"] || scoreTotal} pts`, 15, 58);
         
         let profil = playerData.Profil || document.getElementById('best-path').innerText.replace('👉 PARCOURS CONSEILLÉ : ', '').replace(' 👈', '');
-        doc.text(`Profil Recommandé : ${profil}`, 15, 74);
+        doc.text(`Profil Recommandé : ${profil}`, 15, 66);
 
         if(chartDataUrl) { 
             doc.addImage(chartDataUrl, 'PNG', 120, 40, 75, 75); 
@@ -994,7 +1042,7 @@ function buildPDF(playerData, chartDataUrl) {
         }
         
         doc.autoTable({
-            startY: 125,
+            startY: 120,
             head: [['Catégorie', 'Question Posée', 'Résultat', 'Bonne Réponse']],
             body: tableData,
             headStyles: { fillColor: [46, 204, 113] },
@@ -1098,7 +1146,7 @@ function buildPDF(playerData, chartDataUrl) {
 function generatePlayerPDF() {
     if(!resultsChartInstance) return alert("Graphique non disponible.");
     let chartUrl = resultsChartInstance.toBase64Image();
-    let pData = { Candidat: playerName, "Score Points": scoreTotal, SessionDetails: playerSessionDetails, PIN: playerPin };
+    let pData = { Candidat: playerName, "Score Points": scoreTotal, SessionDetails: playerSessionDetails };
     buildPDF(pData, chartUrl);
 }
 
@@ -1194,7 +1242,6 @@ async function resetQuestionsToDefault() {
 function editQuestion(index) {
     let q = dynamicDB[index];
     
-    // Le menu déroulant affiche les nouveaux labels visuels, mais enregistre la valeur DB
     let formHtml = `
         <h3 style="margin-top:0; color:#2ecc71;">Modification (ID: ${index})</h3>
         <select id="edit-cat" class="editor-select">
@@ -1344,8 +1391,10 @@ document.addEventListener('keydown', function(e) {
             return;
         }
         if (activeScreen) { 
-            if (activeScreen.id === 'screen-start' && document.activeElement.id === 'player-name') { 
-                startQuiz(); 
+            if (activeScreen.id === 'screen-start' && document.activeElement && document.activeElement.tagName === 'BUTTON') { 
+                // Laisse le bouton focalisé fonctionner
+            } else if (activeScreen.id === 'screen-start') {
+                startQuiz();
             } else if (activeScreen.id === 'screen-intermediate') { 
                 goToNextQuestion(); 
             } else if (activeScreen.id === 'screen-results') { 
