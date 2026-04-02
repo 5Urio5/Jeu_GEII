@@ -48,6 +48,11 @@ input[type="text"]:focus, input[type="password"]:focus, .editor-input:focus { bo
 .editor-input, .editor-select { font-size: 1em; padding: 8px; width: 100%; text-align: left; margin: 5px 0 15px 0; }
 .editor-select { width: auto; margin-right: 15px; }
 
+/* NOUVEAU : STYLE FORMULAIRE SATISFACTION */
+.survey-form { text-align: left; margin-bottom: 20px; }
+.survey-form label { display: block; font-size: 1.1em; font-weight: bold; margin-bottom: 8px; color: #ecf0f1; }
+.survey-form select { background-color: rgba(255,255,255,0.9); cursor: pointer; }
+
 /* BOUTONS GENERAUX */
 button { font-family: inherit; outline: none; }
 .main-btn, .secondary-btn {
@@ -147,19 +152,19 @@ th, td { padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.2); vert
 #best-path { font-size: 1.4em !important; white-space: nowrap; overflow: hidden; }
 
 /* MODALES COMMUNES */
-#details-modal, #editor-modal, #password-modal {
+#details-modal, #editor-modal, #password-modal, #admin-hub-modal, #pseudo-choice-modal {
     position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 10000;
     display: flex; align-items: center; justify-content: center;
     opacity: 0; pointer-events: none; transition: opacity 0.3s;
 }
-#details-modal.show, #editor-modal.show, #password-modal.show { opacity: 1; pointer-events: auto; }
+#details-modal.show, #editor-modal.show, #password-modal.show, #admin-hub-modal.show, #pseudo-choice-modal.show { opacity: 1; pointer-events: auto; }
 .modal-content {
     background: #1c2541; width: 95%; max-width: 800px; max-height: 85vh;
     border-radius: 15px; padding: 25px; overflow-y: auto; box-sizing: border-box;
     box-shadow: 0 10px 30px rgba(0,0,0,0.8); position: relative; text-align: left;
 }
 
-/* NOUVEAU LAYOUT : EN-TÊTE DE LA MODALE DÉTAILS (Anti-superposition PC) */
+/* EN-TÊTE DE LA MODALE DÉTAILS (Anti-superposition PC) */
 #modal-header-content {
     display: flex;
     justify-content: space-between;
@@ -167,7 +172,7 @@ th, td { padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.2); vert
     margin-bottom: 15px;
     flex-wrap: wrap;
     gap: 15px;
-    padding-right: 50px; /* MARGE DE SÉCURITÉ POUR LA CROIX */
+    padding-right: 50px; 
 }
 .modal-header-actions {
     display: flex;
@@ -234,50 +239,26 @@ th, td { padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.2); vert
    ADAPTATION MOBILE & RESPONSIVE
    ========================================== */
 @media (max-width: 768px) {
-    /* Repousse le contenu sous les boutons absolus (Croix et Lune) */
     .container { padding-top: 60px; padding-left: 15px; padding-right: 15px; }
-    
-    /* Réduction et repositionnement des boutons absolus */
     #btn-manual-screensaver, .btn-cancel-quiz { top: 15px; right: 15px; font-size: 1.6em; }
-    
     .logo-container { margin-top: 0; padding: 10px 20px; }
     h1 { font-size: 2.2em; }
 
-    /* Correction En-tête : Force le score sous le pseudo */
-    #player-display {
-        display: flex;
-        flex-direction: column;
-        align-items: flex-start;
-        line-height: 1.3;
-    }
-    #live-score {
-        margin-left: 0 !important;
-        font-size: 0.9em;
-    }
+    #player-display { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.3; }
+    #live-score { margin-left: 0 !important; font-size: 0.9em; }
 
     .results-layout, .details-layout { grid-template-columns: 1fr; justify-items: center; text-align: center; }
     
-    /* FIX GRAPHIQUE INVISIBLE SUR MOBILE */
-    .results-chart-container, .details-chart-container {
-        width: 100%;
-        max-width: 300px;
-    }
+    .results-chart-container, .details-chart-container { width: 100%; max-width: 300px; }
 
     #best-path { font-size: 1.1em !important; }
     
-    /* MODALE DÉTAILS MOBILE : On centre tout proprement */
     #modal-header-content { flex-direction: column; align-items: center; text-align: center; padding-right: 0; }
     .modal-header-actions { align-items: center; }
     
     input[type="text"], input[type="password"] { width: 90%; }
     
-    /* Correction du tableau Podium pour les petits écrans (Scroll horizontal) */
-    .podium-table {
-        display: block;
-        overflow-x: auto; 
-        white-space: nowrap; 
-        font-size: 1rem;
-    }
+    .podium-table { display: block; overflow-x: auto; white-space: nowrap; font-size: 1rem; }
     .podium-table th, .podium-table td { padding: 8px 10px; }
     .btn-details { padding: 8px 10px; font-size: 0.85em; }
 }

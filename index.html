@@ -13,14 +13,14 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
 
-    <link rel="stylesheet" href="style.css?v=18">
+    <link rel="stylesheet" href="style.css?v=19">
 </head>
 <body>
 
     <div id="screen-start" class="container active-screen">
         <button id="btn-manual-screensaver" onclick="showScreensaver()" title="Activer l'écran de veille">🌙</button>
 
-        <div class="logo-container" onclick="triggerCheatCode()" style="cursor: pointer;">
+        <div class="logo-container" onclick="openAdminHub()" style="cursor: pointer;">
             <picture>
                 <source srcset="logo_blanc.png?v=11" media="(prefers-color-scheme: dark)">
                 <img id="main-logo" src="logo_noir.png?v=11" alt="Logo GEII" crossorigin="anonymous">
@@ -33,11 +33,6 @@
         <br>
         <button class="main-btn" onclick="startQuiz()">LANCER LE JEU</button>
         <button class="secondary-btn" onclick="showPodium()">🏆 Voir le Podium</button>
-        
-        <div class="admin-tools">
-            <button class="btn-discret" onclick="downloadExcel()">[ Exporter Statistiques ]</button>
-            <button class="btn-discret" onclick="openQuestionEditor()">[ Gérer les Questions ]</button>
-        </div>
     </div>
 
     <div id="screen-game" class="container hidden slide-in-right">
@@ -104,8 +99,55 @@
 
         <div style="display: flex; justify-content: center; gap: 15px; flex-wrap: wrap; margin-top: 20px;">
             <button class="secondary-btn" style="background-color: #e67e22;" onclick="generatePlayerPDF()">📄 Télécharger mon Bilan (PDF)</button>
-            <button class="main-btn" style="margin: 10px 0; width: auto;" onclick="showPodium()">🏆 Voir le Podium</button>
+            <button class="main-btn" style="margin: 10px 0; width: auto;" onclick="openPseudoChoiceModal()">🏆 Accéder au Podium</button>
         </div>
+    </div>
+
+    <div id="screen-survey" class="container hidden slide-in-right">
+        <h1 style="color: #f1c40f;">Ton avis nous intéresse !</h1>
+        <p style="font-size: 1.1em; margin-bottom: 20px;">Afin de valider notre projet de communication GEII, pourrais-tu répondre rapidement à ces quelques questions ?</p>
+        
+        <div class="survey-form">
+            <label>1. Le jeu t'a-t-il permis de mieux comprendre ce qu'est le BUT GEII et ses parcours ?</label>
+            <select id="survey-q1" class="editor-select" style="width: 100%;">
+                <option value="" disabled selected>Choisis une réponse...</option>
+                <option value="Oui, totalement">Oui, totalement</option>
+                <option value="Partiellement">Partiellement</option>
+                <option value="Non, ce n'est toujours pas clair">Non, ce n'est toujours pas clair</option>
+                <option value="Je ne sais pas">Je ne sais pas</option>
+            </select>
+
+            <label>2. Après cette présentation, la formation GEII pourrait-elle t'intéresser ?</label>
+            <select id="survey-q2" class="editor-select" style="width: 100%;">
+                <option value="" disabled selected>Choisis une réponse...</option>
+                <option value="Oui, c'est une possibilité">Oui, c'est une possibilité</option>
+                <option value="Je dois encore y réfléchir">Je dois encore y réfléchir</option>
+                <option value="Non, cela ne correspond pas à mon profil">Non, cela ne correspond pas à mon profil</option>
+                <option value="Sans avis">Sans avis</option>
+            </select>
+
+            <label>3. Que penses-tu du format "Jeu de Quiz" par rapport à un diaporama classique ?</label>
+            <select id="survey-q3" class="editor-select" style="width: 100%;">
+                <option value="" disabled selected>Choisis une réponse...</option>
+                <option value="C'est plus captivant et interactif">C'est plus captivant et interactif</option>
+                <option value="C'est équivalent">C'est équivalent</option>
+                <option value="C'est moins efficace">C'est moins efficace</option>
+                <option value="Je ne sais pas">Je ne sais pas</option>
+            </select>
+
+            <label>4. Comment as-tu trouvé le niveau de difficulté des questions techniques ?</label>
+            <select id="survey-q4" class="editor-select" style="width: 100%;">
+                <option value="" disabled selected>Choisis une réponse...</option>
+                <option value="Trop difficiles">Trop difficiles</option>
+                <option value="Accessibles avec de la réflexion">Accessibles avec de la réflexion</option>
+                <option value="Trop faciles">Trop faciles</option>
+            </select>
+
+            <label>5. Une remarque ou un conseil pour améliorer notre présentation ? (Optionnel)</label>
+            <textarea id="survey-q5" rows="2" placeholder="Tape ton message ici..." style="width: 100%; padding: 10px; border-radius: 8px; font-family: inherit; margin-bottom: 20px;"></textarea>
+        </div>
+
+        <button class="main-btn" onclick="submitSurveyAndGoToPodium()">Envoyer et voir le Podium</button>
     </div>
 
     <div id="screen-podium" class="container hidden slide-in-right">
@@ -127,14 +169,11 @@
         </table>
         <br><br>
         <button class="main-btn" onclick="goToStart()">RETOUR AU MENU</button>
-        <div class="admin-tools">
-            <button class="btn-discret" onclick="resetPodium()">[ Réinitialiser la Base de Données ]</button>
-        </div>
     </div>
 
     <div id="details-modal">
         <div class="modal-content">
-            <span class="close-btn" onclick="closeModal()">&times;</span>
+            <span class="close-btn" onclick="closeModal('details-modal')">&times;</span>
             <div id="modal-header-content"></div>
             
             <div class="details-layout">
@@ -162,14 +201,46 @@
         </div>
     </div>
 
+    <div id="admin-hub-modal">
+        <div class="modal-content" style="max-width: 600px; text-align: center;">
+            <span class="close-btn" onclick="closeModal('admin-hub-modal')">&times;</span>
+            <h1 style="color:#f1c40f; margin-top: 0;">⚙️ TABLEAU DE BORD</h1>
+            <p style="margin-bottom: 25px; color: #bdc3c7;">Espace réservé à l'administration du jeu.</p>
+            
+            <div style="display: flex; flex-direction: column; gap: 15px;">
+                <button class="secondary-btn" style="background-color: #3498db;" onclick="openQuestionEditor()">📝 Gérer les questions</button>
+                <button class="secondary-btn" style="background-color: #e67e22;" onclick="exportQuestionsPDF()">📄 Exporter les questions (PDF)</button>
+                <button class="secondary-btn" style="background-color: #2ecc71;" onclick="downloadExcel()">📊 Exporter les scores (Excel)</button>
+                <button class="secondary-btn" style="background-color: #9b59b6;" onclick="exportSurveyExcel()">📉 Exporter la Satisfaction (Excel)</button>
+                <button class="secondary-btn" style="background-color: #f1c40f; color: #2c3e50;" onclick="startDemoMode()">🤖 Lancer une Partie Démo</button>
+                <button class="secondary-btn" style="background-color: #e74c3c; margin-top: 20px;" onclick="resetPodium()">🗑️ Réinitialiser la Base de Données</button>
+            </div>
+        </div>
+    </div>
+
     <div id="editor-modal">
         <div class="modal-content" style="max-width: 1000px;">
-            <span class="close-btn" onclick="closeEditor()">&times;</span>
+            <span class="close-btn" onclick="closeModal('editor-modal')">&times;</span>
             <h2 style="color:#f1c40f; margin-top:0;">Gérer les Questions (Base de données)</h2>
-            <div style="margin-bottom: 15px;">
-                <button class="secondary-btn" style="background-color: #2ecc71;" onclick="addNewQuestion()">+ Ajouter une question</button>
-                <button class="secondary-btn" style="background-color: #e74c3c;" onclick="resetQuestionsToDefault()">⚠️ Restaurer questions par défaut</button>
+            
+            <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
+                <button class="secondary-btn" style="background-color: #2ecc71; margin:0;" onclick="addNewQuestion()">+ Ajouter une question</button>
+                <select id="filter-cat" class="editor-select" style="margin:0; padding: 10px;" onchange="renderEditorList()">
+                    <option value="ALL">Toutes les catégories</option>
+                    <option value="AII">AII</option>
+                    <option value="EME">EME</option>
+                    <option value="ESE">ESE</option>
+                </select>
+                <select id="filter-diff" class="editor-select" style="margin:0; padding: 10px;" onchange="renderEditorList()">
+                    <option value="ALL">Toutes les difficultés</option>
+                    <option value="Com">CG</option>
+                    <option value="STI">STI2D</option>
+                    <option value="BU1">BUT1</option>
+                    <option value="BU2">BUT2</option>
+                </select>
+                <button class="secondary-btn" style="background-color: #e74c3c; margin:0; margin-left: auto;" onclick="resetQuestionsToDefault()">⚠️ Restaurer par défaut</button>
             </div>
+
             <div id="editor-form-container" class="hidden" style="background: rgba(0,0,0,0.4); padding: 15px; border-radius: 10px; margin-bottom: 20px;"></div>
             <div style="max-height: 50vh; overflow-y: auto;">
                 <table class="stat-table">
@@ -190,7 +261,7 @@
 
     <div id="password-modal">
         <div class="modal-content pwd-modal-box">
-            <h2 id="pwd-modal-title" style="color:#f1c40f; margin-top: 0;">⚠️ ZONE ADMINISTRATEUR ⚠️</h2>
+            <h2 id="pwd-modal-title" style="color:#f1c40f; margin-top: 0;">⚠️ ZONE SÉCURISÉE ⚠️</h2>
             <p id="pwd-modal-desc" style="font-size: 1.2em; margin-bottom: 20px;">Veuillez entrer le mot de passe :</p>
             <div class="pwd-container">
                 <input type="password" id="admin-pwd-input" placeholder="Mot de passe" autocomplete="off">
@@ -199,6 +270,23 @@
             <div style="display: flex; gap: 10px; justify-content: center; margin-top: 20px;">
                 <button class="secondary-btn" id="cancel-pwd-btn" style="background-color: #e74c3c; margin: 0; width: 45%;">Annuler</button>
                 <button class="main-btn" id="submit-pwd-btn" style="margin: 0; width: 45%; padding: 15px;">Valider</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="pseudo-choice-modal">
+        <div class="modal-content pwd-modal-box">
+            <h2 style="color:#3498db; margin-top: 0;">Publication des résultats</h2>
+            <p style="font-size: 1.1em; margin-bottom: 20px;">Ton identifiant actuel est le <strong style="color:#e74c3c;" id="pseudo-choice-display"></strong>.<br><br>Souhaites-tu t'afficher publiquement sur le classement avec ton prénom ou un pseudonyme ?</p>
+            <input type="text" id="optional-pseudo-input" placeholder="Nouveau pseudo (Optionnel)" autocomplete="off" maxlength="15" style="display: none; margin-top: 10px;">
+            
+            <div id="pseudo-buttons-step1" style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+                <button class="secondary-btn" style="background-color: #7f8c8d; margin: 0; width: 45%;" onclick="skipPseudoChoice()">Non, rester anonyme</button>
+                <button class="main-btn" style="margin: 0; width: 45%; padding: 15px;" onclick="showPseudoInput()">Oui, choisir un nom</button>
+            </div>
+            
+            <div id="pseudo-buttons-step2" style="display: none; gap: 10px; justify-content: center; margin-top: 15px;">
+                <button class="main-btn" style="margin: 0; width: 100%; padding: 15px;" onclick="savePseudoChoice()">Enregistrer et continuer</button>
             </div>
         </div>
     </div>
@@ -218,6 +306,6 @@
     </div>
 
     <script src="questions.js"></script>
-    <script type="module" src="script.js?v=18"></script>
+    <script type="module" src="script.js?v=19"></script>
 </body>
 </html>

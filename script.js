@@ -74,6 +74,17 @@ window.submitNewPassword = submitNewPassword;
 window.filterPodium = filterPodium;
 window.editPseudo = editPseudo;
 window.changePlayerPassword = changePlayerPassword;
+// NOUVELLES FONCTIONS
+window.openAdminHub = openAdminHub;
+window.startDemoMode = startDemoMode;
+window.exportQuestionsPDF = exportQuestionsPDF;
+window.renderEditorList = renderEditorList;
+window.openPseudoChoiceModal = openPseudoChoiceModal;
+window.skipPseudoChoice = skipPseudoChoice;
+window.showPseudoInput = showPseudoInput;
+window.savePseudoChoice = savePseudoChoice;
+window.submitSurveyAndGoToPodium = submitSurveyAndGoToPodium;
+window.exportSurveyExcel = exportSurveyExcel;
 
 // ==========================================
 // VARIABLES GLOBALES & CHARGEMENT
@@ -99,8 +110,6 @@ let resultsChartInstance = null;
 let modalChartInstance = null;
 let currentViewingPlayerId = null; 
 let isDemoMode = false; 
-
-// 🔥 NOUVEAU : On sauvegarde le numéro attribué pour pouvoir le libérer s'il quitte
 let currentAssignedNum = null; 
 
 async function loadQuestionsFromFirebase() {
@@ -122,7 +131,7 @@ loadQuestionsFromFirebase();
 // ==========================================
 // 🛡️ MODALE DU MOT DE PASSE (DYNAMIQUE)
 // ==========================================
-function askPassword(customTitle = "⚠️ ZONE ADMINISTRATEUR ⚠️", customDesc = "Veuillez entrer le mot de passe :") {
+function askPassword(customTitle = "⚠️ ZONE SÉCURISÉE ⚠️", customDesc = "Veuillez entrer le mot de passe :") {
     return new Promise((resolve) => {
         const modal = document.getElementById('password-modal');
         const titleEl = document.getElementById('pwd-modal-title');
@@ -149,10 +158,7 @@ function askPassword(customTitle = "⚠️ ZONE ADMINISTRATEUR ⚠️", customDe
         submitBtn.onclick = () => { cleanup(); resolve(input.value); };
         cancelBtn.onclick = () => { cleanup(); resolve(null); };
         
-        input.onkeydown = (e) => { 
-            if (e.key === 'Enter') { cleanup(); resolve(input.value); } 
-            if (e.key === 'Escape') { cleanup(); resolve(null); }
-        };
+        // La touche "Entrée" est gérée par l'écouteur global à la fin du script
     });
 }
 
@@ -287,7 +293,7 @@ async function cancelQuiz() {
     if (confirm("⚠️ Es-tu sûr de vouloir annuler la partie en cours ?\n\nTa progression ne sera pas sauvegardée et n'apparaîtra pas dans le classement. Tu perdras tout.")) {
         clearInterval(timerInterval); 
         
-        // 🔥 Si le joueur annule sa partie, on libère le numéro de joueur généré !
+        // Libération du numéro en cas d'annulation
         if (currentAssignedNum !== null) {
             try { await set(ref(db, `metadata/usedIds/${currentAssignedNum}`), null); } 
             catch(e) {}
@@ -303,15 +309,20 @@ function getRandom(arr, n) {
     return shuffled.slice(0, n); 
 }
 
-// DÉCLENCHEUR DÉMO (EASTER EGG)
-async function triggerCheatCode() {
-    let pwd = await askPassword("🤫 MODE DÉMO", "Entrez le mot de passe administrateur :");
+// 🔥 NOUVEAU HUB ADMINISTRATEUR 🔥
+async function openAdminHub() {
+    let pwd = await askPassword("🔒 ESPACE ADMINISTRATEUR", "Veuillez entrer le mot de passe administrateur :");
     if (pwd === ADMIN_PASSWORD) {
-        isDemoMode = true;
-        startQuiz();
+        document.getElementById('admin-hub-modal').classList.add('show');
     } else if (pwd !== null) {
         alert("❌ Mot de passe incorrect.");
     }
+}
+
+function startDemoMode() {
+    closeModal('admin-hub-modal');
+    isDemoMode = true;
+    startQuiz();
 }
 
 async function startQuiz() {
@@ -327,7 +338,7 @@ async function startQuiz() {
     playerSessionDetails = [];
     currentAssignedNum = null;
 
-    // Mixage des questions depuis la base de données dynamique
+    // Mixage des questions
     let selected = [];
     ['AII', 'EME', 'ESE'].forEach(cat => {
         let catQ = dynamicDB.filter(q => q.cat === cat);
@@ -344,10 +355,10 @@ async function startQuiz() {
         isDemoMode = false; 
         playerName = "PlayerManon (Démo)";
         
-        // On simule 29 questions instantanément pour te laisser la 30ème !
+        // Simulation instantanée des 29 premières questions
         for(let i = 0; i < 29; i++) {
             let q = currentQuestions[i];
-            let isCorrect = Math.random() > 0.3; // 70% de chance d'avoir juste
+            let isCorrect = Math.random() > 0.3; 
             let timeTaken = Math.floor(Math.random() * 15) + 2; 
             let timeLeftSim = timeLimit - timeTaken;
             
@@ -371,9 +382,8 @@ async function startQuiz() {
             });
         }
         
-        currentQIndex = 29; // On se place directement sur la 30ème question (Index 29)
+        currentQIndex = 29; // Positionnement sur la 30ème question
         
-        // On remplit visuellement la jauge des 29 questions précédentes
         let progContainer = document.getElementById('progress-container'); 
         progContainer.innerHTML = '';
         for(let i=0; i<30; i++) { 
@@ -389,7 +399,7 @@ async function startQuiz() {
         
         document.getElementById('player-display').innerHTML = `👤 ${playerName} <span style="margin-left:20px; color:#f1c40f;" id="live-score">${scoreTotal} pts</span>`;
         slideTo('screen-game'); 
-        loadQuestion(); // On lance la dernière question
+        loadQuestion(); 
         return; 
     }
 
@@ -399,12 +409,11 @@ async function startQuiz() {
         await runTransaction(idsRef, (currentData) => {
             let data = currentData || {};
             let id = 1;
-            // On cherche le plus petit ID disponible
             while (data[id.toString()]) {
                 id++;
             }
-            data[id.toString()] = true; // On réserve ce numéro
-            currentAssignedNum = id; // On l'enregistre localement
+            data[id.toString()] = true; 
+            currentAssignedNum = id; 
             return data;
         });
     } catch (error) {
@@ -530,7 +539,8 @@ function processAnswer(selectedIndex, correctIndex, clickedBtn) {
         isCorrect: isCorrect, 
         time: timeTaken, 
         points: pointsGained, 
-        correctAnsText: qData.opt[qData.ans] 
+        correctAnsText: qData.opt[qData.ans],
+        trivia: qData.trivia // Stocké pour l'export PDF Admin
     });
 
     document.getElementById('live-score').innerText = `${scoreTotal} pts`;
@@ -595,7 +605,6 @@ function goToNextQuestion() {
         slideTo('screen-suspense'); 
         playSound('drumroll'); 
         setTimeout(async () => { 
-            // Fin du suspense -> Création du Mot de Passe
             document.getElementById('cp-player-name').innerText = playerName;
             document.getElementById('new-player-pin').value = '';
             slideTo('screen-create-password');
@@ -732,7 +741,6 @@ async function showResultsFinal() {
     let radarData = calculateRadarData(playerSessionDetails);
     resultsChartInstance = drawRadarChart('results-chart', radarData, resultsChartInstance);
 
-    // Sauvegarde Finale dans Firebase (inclut le PlayerNum pour le libérer plus tard si besoin)
     saveScoreFirebase(playerName, scoreTotal, bestCat, playerPin, currentAssignedNum);
     slideTo('screen-results');
 }
@@ -740,7 +748,7 @@ async function showResultsFinal() {
 function saveScoreFirebase(name, totalScore, profil, pin, pNum) {
     push(ref(db, 'scores'), { 
         "Candidat": name, 
-        "playerNum": pNum, // Garde la trace du numéro original
+        "playerNum": pNum,
         "Score Points": totalScore, 
         "Profil": profil, 
         "ScoresCount": scoresCount, 
@@ -749,6 +757,79 @@ function saveScoreFirebase(name, totalScore, profil, pin, pNum) {
         "keep": false, 
         "PIN": pin || "" 
     });
+}
+
+// ==========================================
+// CHOIX DU PSEUDO & QUESTIONNAIRE
+// ==========================================
+function openPseudoChoiceModal() {
+    document.getElementById('pseudo-choice-display').innerText = playerName;
+    document.getElementById('optional-pseudo-input').style.display = 'none';
+    document.getElementById('optional-pseudo-input').value = '';
+    document.getElementById('pseudo-buttons-step1').style.display = 'flex';
+    document.getElementById('pseudo-buttons-step2').style.display = 'none';
+    document.getElementById('pseudo-choice-modal').classList.add('show');
+}
+
+function skipPseudoChoice() {
+    closeModal('pseudo-choice-modal');
+    slideTo('screen-survey');
+}
+
+function showPseudoInput() {
+    document.getElementById('pseudo-buttons-step1').style.display = 'none';
+    document.getElementById('optional-pseudo-input').style.display = 'block';
+    document.getElementById('pseudo-buttons-step2').style.display = 'flex';
+    document.getElementById('optional-pseudo-input').focus();
+}
+
+async function savePseudoChoice() {
+    let input = document.getElementById('optional-pseudo-input').value.trim();
+    if (input !== "") {
+        let cleanName = sanitizeString(input);
+        try {
+            // Mettre à jour Firebase avec le pseudo
+            const snapshot = await get(ref(db, 'scores'));
+            if (snapshot.exists()) {
+                const scoresObj = snapshot.val();
+                for (let key in scoresObj) {
+                    if (scoresObj[key].Candidat === playerName && scoresObj[key].PIN === playerPin) {
+                        await set(ref(db, `scores/${key}/Candidat`), cleanName);
+                        playerName = cleanName; // Mettre à jour la variable globale
+                        break;
+                    }
+                }
+            }
+        } catch(e) { console.error(e); }
+    }
+    closeModal('pseudo-choice-modal');
+    slideTo('screen-survey');
+}
+
+async function submitSurveyAndGoToPodium() {
+    let q1 = document.getElementById('survey-q1').value;
+    let q2 = document.getElementById('survey-q2').value;
+    let q3 = document.getElementById('survey-q3').value;
+    let q4 = document.getElementById('survey-q4').value;
+    let q5 = document.getElementById('survey-q5').value.trim();
+
+    if (!q1 || !q2 || !q3 || !q4) {
+        return alert("Merci de répondre aux 4 questions à choix multiple avant de valider !");
+    }
+
+    try {
+        await push(ref(db, 'feedbacks'), {
+            "Joueur": playerName,
+            "Q1_Comprehension": q1,
+            "Q2_Interet": q2,
+            "Q3_Format": q3,
+            "Q4_Difficulte": q4,
+            "Q5_Remarque": sanitizeString(q5),
+            "Date": new Date().toLocaleDateString('fr-FR')
+        });
+    } catch(e) { console.error("Erreur feedback", e); }
+
+    showPodium();
 }
 
 // ==========================================
@@ -915,8 +996,12 @@ async function changePlayerPassword(playerId) {
     }
 }
 
-function closeModal() { 
-    document.getElementById('details-modal').classList.remove('show'); 
+function closeModal(modalId) { 
+    if(modalId) {
+        document.getElementById(modalId).classList.remove('show'); 
+    } else {
+        document.querySelectorAll('.modal-content').forEach(m => m.parentElement.classList.remove('show'));
+    }
 }
 
 async function toggleKeep(playerId, isChecked) { 
@@ -924,30 +1009,26 @@ async function toggleKeep(playerId, isChecked) {
     catch (e) { console.error(e); } 
 }
 
-// 🔥 NOUVEAU : Supprime le joueur ET libère son numéro original 🔥
 async function deletePlayerScore(playerId) {
     if (confirm("⚠️ Voulez-vous vraiment supprimer ce joueur de la base de données ? Action irréversible.")) {
         try {
             const snap = await get(ref(db, `scores/${playerId}`));
             if (snap.exists()) {
                 let p = snap.val();
-                let numToFree = p.playerNum; // On récupère son vrai numéro de création
+                let numToFree = p.playerNum; 
                 
-                // Sécurité : Si c'est un vieux score d'avant la mise à jour
                 if (!numToFree) {
                     let match = p.Candidat.match(/^Player(\d{4})$/i);
                     if (match) numToFree = parseInt(match[1], 10);
                 }
                 
-                // On libère ce numéro pour le prochain
                 if (numToFree) {
                     await set(ref(db, `metadata/usedIds/${numToFree}`), null);
                 }
             }
             
-            // On supprime la ligne du score
             await set(ref(db, 'scores/' + playerId), null);
-            closeModal();
+            closeModal('details-modal');
             showPodium(); 
         } catch (e) {
             console.error(e);
@@ -957,115 +1038,123 @@ async function deletePlayerScore(playerId) {
 }
 
 async function resetPodium() {
-    let pwd = await askPassword("⚠️ ZONE ADMINISTRATEUR ⚠️", "Veuillez entrer le mot de passe :");
-    
-    if (pwd === ADMIN_PASSWORD) {
-        if (confirm("⚠️ Voulez-vous vraiment effacer TOUS les scores ? Action irréversible.")) {
-            try { 
-                await set(ref(db, 'scores'), null); 
-                await set(ref(db, 'metadata/usedIds'), null); // Purge aussi les numéros
-                alert("🗑️ Base de données réinitialisée !"); 
-                showPodium(); 
-            } catch (error) { alert("Erreur lors de la réinitialisation."); }
-        }
-    } else if (pwd !== null) { 
-        alert("❌ Mot de passe incorrect."); 
+    closeModal('admin-hub-modal');
+    if (confirm("⚠️ Voulez-vous vraiment effacer TOUS les scores ? Action irréversible.")) {
+        try { 
+            await set(ref(db, 'scores'), null); 
+            await set(ref(db, 'metadata/usedIds'), null); 
+            alert("🗑️ Base de données réinitialisée !"); 
+            showPodium(); 
+        } catch (error) { alert("Erreur lors de la réinitialisation."); }
     }
 }
 
 // ==========================================
-// EXPORT EXCEL
+// EXPORT PDF / EXCEL
 // ==========================================
 async function downloadExcel() {
-    let pwd = await askPassword("⚠️ ZONE ADMINISTRATEUR ⚠️", "Veuillez entrer le mot de passe :");
-    
-    if (pwd === ADMIN_PASSWORD) {
-        try {
-            const snapshot = await get(ref(db, 'scores')); 
-            if (!snapshot.exists()) return alert("Aucune donnée à exporter.");
-            
-            let dataPlayers = []; 
-            let dataQuestions = []; 
-            let dataDetails = []; 
-            const scoresObj = snapshot.val(); 
-            let allPlayers = Object.values(scoresObj);
-            
-            for (let key in scoresObj) {
-                let p = scoresObj[key];
-                dataPlayers.push({ 
-                    "Candidat": p.Candidat || "Inconnu", 
-                    "Code Secret": p.PIN || "N/A", 
-                    "Score Global": p["Score Points"] || 0, 
-                    "Profil": p.Profil || "", 
-                    "Points AII": p.ScoresPoints ? p.ScoresPoints.AII : 0, 
-                    "Points EME": p.ScoresPoints ? p.ScoresPoints.EME : 0, 
-                    "Points ESE": p.ScoresPoints ? p.ScoresPoints.ESE : 0, 
-                    "Bonnes Rép. AII": p.ScoresCount ? p.ScoresCount.AII : 0, 
-                    "Bonnes Rép. EME": p.ScoresCount ? p.ScoresCount.EME : 0, 
-                    "Bonnes Rép. ESE": p.ScoresCount ? p.ScoresCount.ESE : 0, 
-                    "Conserver": p.keep ? "OUI" : "NON" 
-                });
-                
-                if (p.SessionDetails) { 
-                    p.SessionDetails.forEach((q, index) => { 
-                        dataDetails.push({ 
-                            "Candidat": p.Candidat, 
-                            "Num": index + 1, 
-                            "Catégorie": q.cat, 
-                            "Diff": DIFF_LABELS[q.diff] || q.diff || '-', 
-                            "Question": q.q, 
-                            "Résultat": q.isCorrect ? "VRAI" : "FAUX", 
-                            "Temps (s)": q.time, 
-                            "Points": q.points 
-                        }); 
-                    }); 
-                }
-            }
-            
-            dataPlayers.sort((a, b) => b["Score Global"] - a["Score Global"]);
-            
-            let globalStats = {};
-            allPlayers.forEach(p => {
-                if (p.SessionDetails) { 
-                    p.SessionDetails.forEach(q => { 
-                        if (!globalStats[q.q]) { globalStats[q.q] = { cat: q.cat, asked: 0, correct: 0 }; } 
-                        globalStats[q.q].asked++; 
-                        if (q.isCorrect) globalStats[q.q].correct++; 
-                    }); 
-                }
+    closeModal('admin-hub-modal');
+    try {
+        const snapshot = await get(ref(db, 'scores')); 
+        if (!snapshot.exists()) return alert("Aucune donnée à exporter.");
+        
+        let dataPlayers = []; 
+        let dataQuestions = []; 
+        let dataDetails = []; 
+        const scoresObj = snapshot.val(); 
+        let allPlayers = Object.values(scoresObj);
+        
+        for (let key in scoresObj) {
+            let p = scoresObj[key];
+            dataPlayers.push({ 
+                "Candidat": p.Candidat || "Inconnu", 
+                "Code Secret": p.PIN || "N/A", 
+                "Score Global": p["Score Points"] || 0, 
+                "Profil": p.Profil || "", 
+                "Points AII": p.ScoresPoints ? p.ScoresPoints.AII : 0, 
+                "Points EME": p.ScoresPoints ? p.ScoresPoints.EME : 0, 
+                "Points ESE": p.ScoresPoints ? p.ScoresPoints.ESE : 0, 
+                "Bonnes Rép. AII": p.ScoresCount ? p.ScoresCount.AII : 0, 
+                "Bonnes Rép. EME": p.ScoresCount ? p.ScoresCount.EME : 0, 
+                "Bonnes Rép. ESE": p.ScoresCount ? p.ScoresCount.ESE : 0, 
+                "Conserver": p.keep ? "OUI" : "NON" 
             });
             
-            for (let qText in globalStats) {
-                let stat = globalStats[qText]; 
-                let successRate = stat.asked > 0 ? Math.round((stat.correct / stat.asked) * 100) + "%" : "0%";
-                dataQuestions.push({ 
-                    "Catégorie": stat.cat, 
-                    "Question": qText, 
-                    "Fois Posée": stat.asked, 
-                    "Bonnes Réponses": stat.correct, 
-                    "Taux Réussite": successRate 
-                });
+            if (p.SessionDetails) { 
+                p.SessionDetails.forEach((q, index) => { 
+                    dataDetails.push({ 
+                        "Candidat": p.Candidat, 
+                        "Num": index + 1, 
+                        "Catégorie": q.cat, 
+                        "Diff": DIFF_LABELS[q.diff] || q.diff || '-', 
+                        "Question": q.q, 
+                        "Résultat": q.isCorrect ? "VRAI" : "FAUX", 
+                        "Temps (s)": q.time, 
+                        "Points": q.points 
+                    }); 
+                }); 
             }
-            
-            dataQuestions.sort((a, b) => a.Catégorie.localeCompare(b.Catégorie));
-            
-            const wb = window.XLSX.utils.book_new();
-            window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(dataPlayers), "Classement");
-            window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(dataQuestions), "Stats Questions");
-            if(dataDetails.length > 0) window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(dataDetails), "Détail Brut");
-            
-            window.XLSX.writeFile(wb, "Resultats_GEII.xlsx");
-        } catch (e) { 
-            alert("Erreur lors de la création du fichier Excel."); 
         }
-    } else if (pwd !== null) { 
-        alert("❌ Mot de passe incorrect."); 
+        
+        dataPlayers.sort((a, b) => b["Score Global"] - a["Score Global"]);
+        
+        let globalStats = {};
+        allPlayers.forEach(p => {
+            if (p.SessionDetails) { 
+                p.SessionDetails.forEach(q => { 
+                    if (!globalStats[q.q]) { globalStats[q.q] = { cat: q.cat, asked: 0, correct: 0 }; } 
+                    globalStats[q.q].asked++; 
+                    if (q.isCorrect) globalStats[q.q].correct++; 
+                }); 
+            }
+        });
+        
+        for (let qText in globalStats) {
+            let stat = globalStats[qText]; 
+            let successRate = stat.asked > 0 ? Math.round((stat.correct / stat.asked) * 100) + "%" : "0%";
+            dataQuestions.push({ 
+                "Catégorie": stat.cat, 
+                "Question": qText, 
+                "Fois Posée": stat.asked, 
+                "Bonnes Réponses": stat.correct, 
+                "Taux Réussite": successRate 
+            });
+        }
+        
+        dataQuestions.sort((a, b) => a.Catégorie.localeCompare(b.Catégorie));
+        
+        const wb = window.XLSX.utils.book_new();
+        window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(dataPlayers), "Classement");
+        window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(dataQuestions), "Stats Questions");
+        if(dataDetails.length > 0) window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(dataDetails), "Détail Brut");
+        
+        window.XLSX.writeFile(wb, "Resultats_GEII.xlsx");
+    } catch (e) { 
+        alert("Erreur lors de la création du fichier Excel."); 
     }
 }
 
-// ==========================================
-// EXPORT PDF
-// ==========================================
+async function exportSurveyExcel() {
+    closeModal('admin-hub-modal');
+    try {
+        const snapshot = await get(ref(db, 'feedbacks')); 
+        if (!snapshot.exists()) return alert("Aucun retour de satisfaction enregistré pour le moment.");
+        
+        let dataFeedback = []; 
+        const feedbackObj = snapshot.val(); 
+        
+        for (let key in feedbackObj) {
+            dataFeedback.push(feedbackObj[key]);
+        }
+        
+        const wb = window.XLSX.utils.book_new();
+        window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(dataFeedback), "Satisfaction");
+        window.XLSX.writeFile(wb, "Satisfaction_GEII.xlsx");
+    } catch(e) {
+        alert("Erreur lors de l'export des retours.");
+    }
+}
+
 function buildPDF(playerData, chartDataUrl) {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
@@ -1232,31 +1321,36 @@ async function generateAdminPDF() {
 // ==========================================
 // EDITEUR DE QUESTIONS (ADMIN)
 // ==========================================
-async function openQuestionEditor() {
-    let pwd = await askPassword("⚠️ ZONE ADMINISTRATEUR ⚠️", "Veuillez entrer le mot de passe :");
-    
-    if (pwd === ADMIN_PASSWORD) { 
-        renderEditorList(); 
-        document.getElementById('editor-modal').classList.add('show'); 
-    } else if (pwd !== null) { 
-        alert("❌ Mot de passe incorrect."); 
-    }
+
+function openQuestionEditor() {
+    closeModal('admin-hub-modal');
+    document.getElementById('filter-cat').value = 'ALL';
+    document.getElementById('filter-diff').value = 'ALL';
+    renderEditorList(); 
+    document.getElementById('editor-modal').classList.add('show'); 
 }
 
 function closeEditor() { 
-    document.getElementById('editor-modal').classList.remove('show'); 
+    closeModal('editor-modal'); 
     document.getElementById('editor-form-container').classList.add('hidden'); 
 }
 
+// NOUVEAU : Rendu filtré
 function renderEditorList() {
     let tbody = document.getElementById('editor-table-body'); 
     tbody.innerHTML = '';
     
+    let filterCat = document.getElementById('filter-cat').value;
+    let filterDiff = document.getElementById('filter-diff').value;
+    
     dynamicDB.forEach((q, i) => { 
+        if (filterCat !== 'ALL' && q.cat !== filterCat) return;
+        if (filterDiff !== 'ALL' && q.diff !== filterDiff) return;
+        
         tbody.innerHTML += `<tr>
             <td style="text-align:center;">${i}</td>
             <td style="text-align:center;">${q.cat}</td>
-            <td style="text-align:center;">${q.diff}</td>
+            <td style="text-align:center;">${DIFF_LABELS[q.diff] || q.diff}</td>
             <td>${q.q}</td>
             <td style="text-align:center;">
                 <button class="btn-details" style="background:#f39c12; margin-bottom:5px;" onclick="editQuestion(${i})">Éditer</button>
@@ -1275,6 +1369,11 @@ function addNewQuestion() {
         ans: 0, 
         trivia: "Le saviez-vous ?" 
     }); 
+    
+    // Annuler les filtres pour voir la nouvelle question s'afficher à la fin
+    document.getElementById('filter-cat').value = 'ALL';
+    document.getElementById('filter-diff').value = 'ALL';
+    renderEditorList();
     editQuestion(dynamicDB.length - 1); 
 }
 
@@ -1344,7 +1443,6 @@ function editQuestion(index) {
 async function saveQuestion(index) {
     let ansRadios = document.getElementsByName('edit-ans'); 
     let ans = 0; 
-    
     for(let i=0; i<ansRadios.length; i++) { 
         if(ansRadios[i].checked) ans = parseInt(ansRadios[i].value); 
     }
@@ -1371,6 +1469,53 @@ async function saveQuestion(index) {
     } catch(e) { 
         alert("Erreur lors de la sauvegarde Firebase."); 
     }
+}
+
+// NOUVEAU : EXPORT DE LA BASE DE QUESTIONS EN PDF
+function exportQuestionsPDF() {
+    closeModal('admin-hub-modal');
+    
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('landscape');
+    
+    doc.setFont("helvetica", "bold"); 
+    doc.setFontSize(16);
+    doc.text("BASE DE DONNÉES DES QUESTIONS GEII", 14, 15);
+    
+    let tableData = [];
+    
+    // On trie proprement par Catégorie puis par Difficulté
+    let sortedDB = [...dynamicDB].sort((a, b) => {
+        if (a.cat === b.cat) return a.diff.localeCompare(b.diff);
+        return a.cat.localeCompare(b.cat);
+    });
+
+    sortedDB.forEach(q => { 
+        tableData.push([ 
+            q.cat, 
+            DIFF_LABELS[q.diff] || q.diff, 
+            q.q, 
+            q.opt[q.ans], 
+            q.trivia 
+        ]); 
+    }); 
+    
+    doc.autoTable({
+        startY: 25,
+        head: [['Catégorie', 'Difficulté', 'Question', 'Bonne Réponse', 'Le Saviez-vous ?']],
+        body: tableData,
+        headStyles: { fillColor: [52, 152, 219] },
+        styles: { fontSize: 9 },
+        columnStyles: { 
+            0: { cellWidth: 20 }, 
+            1: { cellWidth: 20 }, 
+            2: { cellWidth: 80 }, 
+            3: { cellWidth: 50 },
+            4: { cellWidth: 90 }
+        }
+    });
+
+    doc.save(`Questions_GEII.pdf`);
 }
 
 // ==========================================
@@ -1428,9 +1573,6 @@ resetIdleTimer();
 // ==========================================
 document.addEventListener('keydown', function(e) {
     const activeScreen = document.querySelector('.active-screen'); 
-    const detailsModal = document.getElementById('details-modal'); 
-    const pwdModal = document.getElementById('password-modal'); 
-    const editorModal = document.getElementById('editor-modal');
     const screensaver = document.getElementById('screensaver');
     
     if (!screensaver.classList.contains('hidden')) { 
@@ -1438,36 +1580,56 @@ document.addEventListener('keydown', function(e) {
         return; 
     }
     
+    // ETAT DES MODALES
+    const isPasswordOpen = document.getElementById('password-modal').classList.contains('show');
+    const isPseudoChoiceOpen = document.getElementById('pseudo-choice-modal').classList.contains('show');
+    const isDetailsOpen = document.getElementById('details-modal').classList.contains('show');
+    const isEditorOpen = document.getElementById('editor-modal').classList.contains('show');
+    const isAdminHubOpen = document.getElementById('admin-hub-modal').classList.contains('show');
+    
+    const anyModalOpen = isPasswordOpen || isPseudoChoiceOpen || isDetailsOpen || isEditorOpen || isAdminHubOpen;
+
     if (e.key === 'Escape') { 
-        if (detailsModal.classList.contains('show')) { 
-            closeModal(); 
-        } else if (editorModal.classList.contains('show')) { 
-            closeEditor(); 
-        } else if (pwdModal.classList.contains('show')) {
-            // Géré par la modale
-        } else if (activeScreen && (activeScreen.id === 'screen-game' || activeScreen.id === 'screen-intermediate')) { 
+        if (isDetailsOpen) closeModal('details-modal'); 
+        else if (isEditorOpen) closeEditor(); 
+        else if (isAdminHubOpen) closeModal('admin-hub-modal');
+        else if (isPasswordOpen) closeModal('password-modal');
+        else if (isPseudoChoiceOpen) skipPseudoChoice();
+        else if (activeScreen && (activeScreen.id === 'screen-game' || activeScreen.id === 'screen-intermediate')) { 
             cancelQuiz(); 
         } 
     }
     
     if (e.key === 'Enter') { 
-        if (pwdModal.classList.contains('show')) {
+        // 🔥 L'Entrée gère intelligemment la priorité des fenêtres 🔥
+        if (isPasswordOpen) {
+            document.getElementById('submit-pwd-btn').click();
             return;
         }
+        if (isPseudoChoiceOpen) {
+            if(document.getElementById('optional-pseudo-input').style.display === 'block'){
+                document.getElementById('pseudo-buttons-step2').querySelector('button').click();
+            } else {
+                document.getElementById('pseudo-buttons-step1').querySelectorAll('button')[1].click();
+            }
+            return;
+        }
+        if (anyModalOpen) {
+            return; // Bloque toute autre action d'arrière-plan
+        }
+
+        // Si aucune modale n'est ouverte, on gère les écrans de jeu
         if (activeScreen) { 
-            if (activeScreen.id === 'screen-start' && document.activeElement && document.activeElement.tagName === 'BUTTON') { 
-                // Laisse le bouton focalisé fonctionner
-            } else if (activeScreen.id === 'screen-start') {
+            if (activeScreen.id === 'screen-start') {
                 startQuiz();
             } else if (activeScreen.id === 'screen-intermediate') { 
                 goToNextQuestion(); 
-            } else if (activeScreen.id === 'screen-results') { 
-                showPodium(); 
             } 
         } 
     }
     
-    if (activeScreen && activeScreen.id === 'screen-game') {
+    // FLÈCHES DU CLAVIER (Navigation dans les réponses)
+    if (activeScreen && activeScreen.id === 'screen-game' && !anyModalOpen) {
         if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
             e.preventDefault(); 
             
