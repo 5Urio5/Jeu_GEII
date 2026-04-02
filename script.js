@@ -44,50 +44,7 @@ const analytics = getAnalytics(app);
 const db = getDatabase(app);
 
 // ==========================================
-// EXPOSITION DES FONCTIONS AU HTML
-// ==========================================
-window.startQuiz = startQuiz; 
-window.goToStart = goToStart; 
-window.cancelQuiz = cancelQuiz;
-window.showPodium = showPodium; 
-window.openModal = openModal; 
-window.closeModal = closeModal;
-window.toggleKeep = toggleKeep; 
-window.deletePlayerScore = deletePlayerScore; 
-window.resetPodium = resetPodium; 
-window.downloadExcel = downloadExcel;
-window.showScreensaver = showScreensaver; 
-window.hideScreensaver = hideScreensaver;
-window.goToNextQuestion = goToNextQuestion; 
-window.togglePasswordVisibility = togglePasswordVisibility;
-window.generatePlayerPDF = generatePlayerPDF; 
-window.generateAdminPDF = generateAdminPDF;
-window.openQuestionEditor = openQuestionEditor; 
-window.closeEditor = closeEditor;
-window.addNewQuestion = addNewQuestion; 
-window.editQuestion = editQuestion;
-window.saveQuestion = saveQuestion; 
-window.deleteQuestion = deleteQuestion;
-window.resetQuestionsToDefault = resetQuestionsToDefault;
-window.triggerCheatCode = triggerCheatCode;
-window.submitNewPassword = submitNewPassword;
-window.filterPodium = filterPodium;
-window.editPseudo = editPseudo;
-window.changePlayerPassword = changePlayerPassword;
-// NOUVELLES FONCTIONS
-window.openAdminHub = openAdminHub;
-window.startDemoMode = startDemoMode;
-window.exportQuestionsPDF = exportQuestionsPDF;
-window.renderEditorList = renderEditorList;
-window.openPseudoChoiceModal = openPseudoChoiceModal;
-window.skipPseudoChoice = skipPseudoChoice;
-window.showPseudoInput = showPseudoInput;
-window.savePseudoChoice = savePseudoChoice;
-window.submitSurveyAndGoToPodium = submitSurveyAndGoToPodium;
-window.exportSurveyExcel = exportSurveyExcel;
-
-// ==========================================
-// VARIABLES GLOBALES & CHARGEMENT
+// VARIABLES GLOBALES (Déclarées en premier pour éviter tout bug !)
 // ==========================================
 let playerName = ""; 
 let playerPin = ""; 
@@ -112,6 +69,13 @@ let currentViewingPlayerId = null;
 let isDemoMode = false; 
 let currentAssignedNum = null; 
 
+const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+let audioCtx;
+
+// ==========================================
+// DÉFINITION DES FONCTIONS
+// ==========================================
+
 async function loadQuestionsFromFirebase() {
     try {
         const snap = await get(ref(db, 'questions'));
@@ -126,11 +90,7 @@ async function loadQuestionsFromFirebase() {
         dynamicDB = DB; 
     }
 }
-loadQuestionsFromFirebase();
 
-// ==========================================
-// 🛡️ MODALE DU MOT DE PASSE (DYNAMIQUE)
-// ==========================================
 function askPassword(customTitle = "⚠️ ZONE SÉCURISÉE ⚠️", customDesc = "Veuillez entrer le mot de passe :") {
     return new Promise((resolve) => {
         const modal = document.getElementById('password-modal');
@@ -181,17 +141,10 @@ function sanitizeString(str) {
     });
 }
 
-// ==========================================
-// GESTION AUDIO & BACKGROUND
-// ==========================================
-const bgImages = ['appmeas.jpg', 'intérieur_iut.jpg', 'iut.jpg', 'kart.jpg', 'platine.jpg'];
-
 function setRandomBackground() { 
+    const bgImages = ['appmeas.jpg', 'intérieur_iut.jpg', 'iut.jpg', 'kart.jpg', 'platine.jpg'];
     document.body.style.backgroundImage = `url('${bgImages[Math.floor(Math.random() * bgImages.length)]}')`; 
 }
-
-const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-let audioCtx;
 
 function playSound(type) {
     if (!audioCtx) audioCtx = new AudioContextClass();
@@ -258,9 +211,6 @@ function playSound(type) {
     }
 }
 
-// ==========================================
-// LOGIQUE DE JEU & NAVIGATION UI
-// ==========================================
 function slideTo(screenId) {
     const active = document.querySelector('.active-screen');
     if (active && active.id === screenId) return; 
@@ -293,7 +243,6 @@ async function cancelQuiz() {
     if (confirm("⚠️ Es-tu sûr de vouloir annuler la partie en cours ?\n\nTa progression ne sera pas sauvegardée et n'apparaîtra pas dans le classement. Tu perdras tout.")) {
         clearInterval(timerInterval); 
         
-        // Libération du numéro en cas d'annulation
         if (currentAssignedNum !== null) {
             try { await set(ref(db, `metadata/usedIds/${currentAssignedNum}`), null); } 
             catch(e) {}
@@ -309,7 +258,6 @@ function getRandom(arr, n) {
     return shuffled.slice(0, n); 
 }
 
-// 🔥 NOUVEAU HUB ADMINISTRATEUR 🔥
 async function openAdminHub() {
     let pwd = await askPassword("🔒 ESPACE ADMINISTRATEUR", "Veuillez entrer le mot de passe administrateur :");
     if (pwd === ADMIN_PASSWORD) {
@@ -329,7 +277,6 @@ async function startQuiz() {
     if (!audioCtx) audioCtx = new AudioContextClass(); 
     if (audioCtx.state === 'suspended') audioCtx.resume();
 
-    // Initialisation
     playerPin = ""; 
     scoresPoints = {AII: 0, EME: 0, ESE: 0}; 
     scoresCount = {AII: 0, EME: 0, ESE: 0};
@@ -338,7 +285,6 @@ async function startQuiz() {
     playerSessionDetails = [];
     currentAssignedNum = null;
 
-    // Mixage des questions
     let selected = [];
     ['AII', 'EME', 'ESE'].forEach(cat => {
         let catQ = dynamicDB.filter(q => q.cat === cat);
@@ -350,12 +296,11 @@ async function startQuiz() {
     });
     currentQuestions = selected.sort(() => 0.5 - Math.random());
 
-    // 🔥 GESTION DE LA SIMULATION (MODE DÉMO EXACT) 🔥
+    // SIMULATION MODE DÉMO
     if (isDemoMode) {
         isDemoMode = false; 
         playerName = "PlayerManon (Démo)";
         
-        // Simulation instantanée des 29 premières questions
         for(let i = 0; i < 29; i++) {
             let q = currentQuestions[i];
             let isCorrect = Math.random() > 0.3; 
@@ -382,7 +327,7 @@ async function startQuiz() {
             });
         }
         
-        currentQIndex = 29; // Positionnement sur la 30ème question
+        currentQIndex = 29; 
         
         let progContainer = document.getElementById('progress-container'); 
         progContainer.innerHTML = '';
@@ -403,7 +348,7 @@ async function startQuiz() {
         return; 
     }
 
-    // 🔒 TRANSACTION FIREBASE : L'Algorithme qui comble les trous (1, 2, 4 -> donne 3)
+    // MODE NORMAL
     const idsRef = ref(db, 'metadata/usedIds');
     try {
         await runTransaction(idsRef, (currentData) => {
@@ -540,7 +485,7 @@ function processAnswer(selectedIndex, correctIndex, clickedBtn) {
         time: timeTaken, 
         points: pointsGained, 
         correctAnsText: qData.opt[qData.ans],
-        trivia: qData.trivia // Stocké pour l'export PDF Admin
+        trivia: qData.trivia
     });
 
     document.getElementById('live-score').innerText = `${scoreTotal} pts`;
@@ -615,7 +560,6 @@ function goToNextQuestion() {
 // ==========================================
 // CRÉATION MOT DE PASSE ET RÉSULTATS
 // ==========================================
-
 async function submitNewPassword() {
     let pinInput = document.getElementById('new-player-pin').value.trim();
     if (!pinInput) return alert("Hé ! Tu dois créer un mot de passe pour protéger tes résultats !");
@@ -748,7 +692,7 @@ async function showResultsFinal() {
 function saveScoreFirebase(name, totalScore, profil, pin, pNum) {
     push(ref(db, 'scores'), { 
         "Candidat": name, 
-        "playerNum": pNum,
+        "playerNum": pNum || "",
         "Score Points": totalScore, 
         "Profil": profil, 
         "ScoresCount": scoresCount, 
@@ -788,14 +732,13 @@ async function savePseudoChoice() {
     if (input !== "") {
         let cleanName = sanitizeString(input);
         try {
-            // Mettre à jour Firebase avec le pseudo
             const snapshot = await get(ref(db, 'scores'));
             if (snapshot.exists()) {
                 const scoresObj = snapshot.val();
                 for (let key in scoresObj) {
                     if (scoresObj[key].Candidat === playerName && scoresObj[key].PIN === playerPin) {
                         await set(ref(db, `scores/${key}/Candidat`), cleanName);
-                        playerName = cleanName; // Mettre à jour la variable globale
+                        playerName = cleanName; 
                         break;
                     }
                 }
@@ -1043,6 +986,7 @@ async function resetPodium() {
         try { 
             await set(ref(db, 'scores'), null); 
             await set(ref(db, 'metadata/usedIds'), null); 
+            await set(ref(db, 'feedbacks'), null); // Purge aussi les retours
             alert("🗑️ Base de données réinitialisée !"); 
             showPodium(); 
         } catch (error) { alert("Erreur lors de la réinitialisation."); }
@@ -1050,7 +994,7 @@ async function resetPodium() {
 }
 
 // ==========================================
-// EXPORT PDF / EXCEL
+// EXPORTS (EXCEL & PDF)
 // ==========================================
 async function downloadExcel() {
     closeModal('admin-hub-modal');
@@ -1335,7 +1279,6 @@ function closeEditor() {
     document.getElementById('editor-form-container').classList.add('hidden'); 
 }
 
-// NOUVEAU : Rendu filtré
 function renderEditorList() {
     let tbody = document.getElementById('editor-table-body'); 
     tbody.innerHTML = '';
@@ -1370,7 +1313,6 @@ function addNewQuestion() {
         trivia: "Le saviez-vous ?" 
     }); 
     
-    // Annuler les filtres pour voir la nouvelle question s'afficher à la fin
     document.getElementById('filter-cat').value = 'ALL';
     document.getElementById('filter-diff').value = 'ALL';
     renderEditorList();
@@ -1471,7 +1413,6 @@ async function saveQuestion(index) {
     }
 }
 
-// NOUVEAU : EXPORT DE LA BASE DE QUESTIONS EN PDF
 function exportQuestionsPDF() {
     closeModal('admin-hub-modal');
     
@@ -1484,7 +1425,6 @@ function exportQuestionsPDF() {
     
     let tableData = [];
     
-    // On trie proprement par Catégorie puis par Difficulté
     let sortedDB = [...dynamicDB].sort((a, b) => {
         if (a.cat === b.cat) return a.diff.localeCompare(b.diff);
         return a.cat.localeCompare(b.cat);
@@ -1566,6 +1506,7 @@ function hideScreensaver() {
     resetIdleTimer(); 
 }
 
+// Lancement au chargement de la page
 resetIdleTimer();
 
 // ==========================================
@@ -1601,7 +1542,7 @@ document.addEventListener('keydown', function(e) {
     }
     
     if (e.key === 'Enter') { 
-        // 🔥 L'Entrée gère intelligemment la priorité des fenêtres 🔥
+        // L'Entrée gère intelligemment la priorité des fenêtres pour éviter les bugs !
         if (isPasswordOpen) {
             document.getElementById('submit-pwd-btn').click();
             return;
@@ -1615,10 +1556,9 @@ document.addEventListener('keydown', function(e) {
             return;
         }
         if (anyModalOpen) {
-            return; // Bloque toute autre action d'arrière-plan
+            return; 
         }
 
-        // Si aucune modale n'est ouverte, on gère les écrans de jeu
         if (activeScreen) { 
             if (activeScreen.id === 'screen-start') {
                 startQuiz();

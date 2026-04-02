@@ -13,7 +13,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
 
-    <link rel="stylesheet" href="style.css?v=19">
+    <link rel="stylesheet" href="style.css?v=20">
 </head>
 <body>
 
@@ -108,7 +108,7 @@
         <p style="font-size: 1.1em; margin-bottom: 20px;">Afin de valider notre projet de communication GEII, pourrais-tu répondre rapidement à ces quelques questions ?</p>
         
         <div class="survey-form">
-            <label>1. Le jeu t'a-t-il permis de mieux comprendre ce qu'est le BUT GEII et ses parcours ?</label>
+            <label for="survey-q1">1. Le jeu t'a-t-il permis de mieux comprendre ce qu'est le BUT GEII et ses parcours ?</label>
             <select id="survey-q1" class="editor-select" style="width: 100%;">
                 <option value="" disabled selected>Choisis une réponse...</option>
                 <option value="Oui, totalement">Oui, totalement</option>
@@ -117,7 +117,7 @@
                 <option value="Je ne sais pas">Je ne sais pas</option>
             </select>
 
-            <label>2. Après cette présentation, la formation GEII pourrait-elle t'intéresser ?</label>
+            <label for="survey-q2">2. Après cette présentation, la formation GEII pourrait-elle t'intéresser ?</label>
             <select id="survey-q2" class="editor-select" style="width: 100%;">
                 <option value="" disabled selected>Choisis une réponse...</option>
                 <option value="Oui, c'est une possibilité">Oui, c'est une possibilité</option>
@@ -126,7 +126,7 @@
                 <option value="Sans avis">Sans avis</option>
             </select>
 
-            <label>3. Que penses-tu du format "Jeu de Quiz" par rapport à un diaporama classique ?</label>
+            <label for="survey-q3">3. Que penses-tu du format "Jeu de Quiz" par rapport à un diaporama classique ?</label>
             <select id="survey-q3" class="editor-select" style="width: 100%;">
                 <option value="" disabled selected>Choisis une réponse...</option>
                 <option value="C'est plus captivant et interactif">C'est plus captivant et interactif</option>
@@ -135,7 +135,7 @@
                 <option value="Je ne sais pas">Je ne sais pas</option>
             </select>
 
-            <label>4. Comment as-tu trouvé le niveau de difficulté des questions techniques ?</label>
+            <label for="survey-q4">4. Comment as-tu trouvé le niveau de difficulté des questions techniques ?</label>
             <select id="survey-q4" class="editor-select" style="width: 100%;">
                 <option value="" disabled selected>Choisis une réponse...</option>
                 <option value="Trop difficiles">Trop difficiles</option>
@@ -143,7 +143,7 @@
                 <option value="Trop faciles">Trop faciles</option>
             </select>
 
-            <label>5. Une remarque ou un conseil pour améliorer notre présentation ? (Optionnel)</label>
+            <label for="survey-q5">5. Une remarque ou un conseil pour améliorer notre présentation ? (Optionnel)</label>
             <textarea id="survey-q5" rows="2" placeholder="Tape ton message ici..." style="width: 100%; padding: 10px; border-radius: 8px; font-family: inherit; margin-bottom: 20px;"></textarea>
         </div>
 
@@ -306,6 +306,6 @@
     </div>
 
     <script src="questions.js"></script>
-    <script type="module" src="script.js?v=19"></script>
+    <script type="module" src="script.js?v=20"></script>
 </body>
 </html>
