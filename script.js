@@ -24,9 +24,10 @@ const DIFF_LABELS = {
 // ==========================================
 // FIREBASE - CONNEXION BASE DE DONNÉES TEMPS RÉEL
 // ==========================================
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
-import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-analytics.js";
-import { getDatabase, ref, push, get, set, runTransaction } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js";
+// ⚠️ Correction de la version Firebase en 10.8.1 (La 12.11.0 n'existe pas et faisait crasher le script)
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-analytics.js";
+import { getDatabase, ref, push, get, set, runTransaction } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyA5xccoSduwPvhrnR769i_2Fhp9zW63C5M",
@@ -44,7 +45,7 @@ const analytics = getAnalytics(app);
 const db = getDatabase(app);
 
 // ==========================================
-// VARIABLES GLOBALES (Déclarées en premier pour éviter tout bug !)
+// VARIABLES GLOBALES (Toujours déclarer avant l'utilisation !)
 // ==========================================
 let playerName = ""; 
 let playerPin = ""; 
@@ -73,6 +74,48 @@ const AudioContextClass = window.AudioContext || window.webkitAudioContext;
 let audioCtx;
 
 // ==========================================
+// EXPOSITION DES FONCTIONS AU HTML
+// ==========================================
+window.startQuiz = startQuiz; 
+window.goToStart = goToStart; 
+window.cancelQuiz = cancelQuiz;
+window.showPodium = showPodium; 
+window.openModal = openModal; 
+window.closeModal = closeModal;
+window.toggleKeep = toggleKeep; 
+window.deletePlayerScore = deletePlayerScore; 
+window.resetPodium = resetPodium; 
+window.downloadExcel = downloadExcel;
+window.showScreensaver = showScreensaver; 
+window.hideScreensaver = hideScreensaver;
+window.goToNextQuestion = goToNextQuestion; 
+window.togglePasswordVisibility = togglePasswordVisibility;
+window.generatePlayerPDF = generatePlayerPDF; 
+window.generateAdminPDF = generateAdminPDF;
+window.openQuestionEditor = openQuestionEditor; 
+window.closeEditor = closeEditor;
+window.addNewQuestion = addNewQuestion; 
+window.editQuestion = editQuestion;
+window.saveQuestion = saveQuestion; 
+window.deleteQuestion = deleteQuestion;
+window.resetQuestionsToDefault = resetQuestionsToDefault;
+// 🔥 CORRECTION : L'ancienne ligne "window.triggerCheatCode" qui faisait tout planter a bien été retirée !
+window.submitNewPassword = submitNewPassword;
+window.filterPodium = filterPodium;
+window.editPseudo = editPseudo;
+window.changePlayerPassword = changePlayerPassword;
+window.openAdminHub = openAdminHub;
+window.startDemoMode = startDemoMode;
+window.exportQuestionsPDF = exportQuestionsPDF;
+window.renderEditorList = renderEditorList;
+window.openPseudoChoiceModal = openPseudoChoiceModal;
+window.skipPseudoChoice = skipPseudoChoice;
+window.showPseudoInput = showPseudoInput;
+window.savePseudoChoice = savePseudoChoice;
+window.submitSurveyAndGoToPodium = submitSurveyAndGoToPodium;
+window.exportSurveyExcel = exportSurveyExcel;
+
+// ==========================================
 // DÉFINITION DES FONCTIONS
 // ==========================================
 
@@ -82,14 +125,17 @@ async function loadQuestionsFromFirebase() {
         if (snap.exists()) {
             dynamicDB = snap.val();
         } else {
-            await set(ref(db, 'questions'), DB);
-            dynamicDB = DB;
+            // Sécurité anti-crash si le fichier local "questions.js" n'est pas chargé
+            let localDB = (typeof DB !== 'undefined') ? DB : [];
+            await set(ref(db, 'questions'), localDB);
+            dynamicDB = localDB;
         }
     } catch (error) {
         console.error("Erreur de chargement des questions, utilisation locale.", error);
-        dynamicDB = DB; 
+        dynamicDB = (typeof DB !== 'undefined') ? DB : []; 
     }
 }
+loadQuestionsFromFirebase();
 
 function askPassword(customTitle = "⚠️ ZONE SÉCURISÉE ⚠️", customDesc = "Veuillez entrer le mot de passe :") {
     return new Promise((resolve) => {
@@ -117,8 +163,6 @@ function askPassword(customTitle = "⚠️ ZONE SÉCURISÉE ⚠️", customDesc 
         
         submitBtn.onclick = () => { cleanup(); resolve(input.value); };
         cancelBtn.onclick = () => { cleanup(); resolve(null); };
-        
-        // La touche "Entrée" est gérée par l'écouteur global à la fin du script
     });
 }
 
@@ -135,6 +179,7 @@ function togglePasswordVisibility() {
 }
 
 function sanitizeString(str) {
+    if(!str) return "";
     return str.replace(/[&<>'"]/g, function(tag) {
         const charsToReplace = { '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' };
         return charsToReplace[tag] || tag;
@@ -285,6 +330,7 @@ async function startQuiz() {
     playerSessionDetails = [];
     currentAssignedNum = null;
 
+    // Mixage des questions
     let selected = [];
     ['AII', 'EME', 'ESE'].forEach(cat => {
         let catQ = dynamicDB.filter(q => q.cat === cat);
@@ -323,7 +369,8 @@ async function startQuiz() {
             playerSessionDetails.push({
                 cat: q.cat, diff: q.diff, q: q.q,
                 isCorrect: isCorrect, time: timeTaken, points: pointsGained,
-                correctAnsText: q.opt[q.ans]
+                correctAnsText: q.opt[q.ans],
+                trivia: q.trivia
             });
         }
         
@@ -348,7 +395,7 @@ async function startQuiz() {
         return; 
     }
 
-    // MODE NORMAL
+    // MODE NORMAL : Algorithme anti-doublon et recyclage des numéros
     const idsRef = ref(db, 'metadata/usedIds');
     try {
         await runTransaction(idsRef, (currentData) => {
@@ -560,6 +607,7 @@ function goToNextQuestion() {
 // ==========================================
 // CRÉATION MOT DE PASSE ET RÉSULTATS
 // ==========================================
+
 async function submitNewPassword() {
     let pinInput = document.getElementById('new-player-pin').value.trim();
     if (!pinInput) return alert("Hé ! Tu dois créer un mot de passe pour protéger tes résultats !");
@@ -986,7 +1034,7 @@ async function resetPodium() {
         try { 
             await set(ref(db, 'scores'), null); 
             await set(ref(db, 'metadata/usedIds'), null); 
-            await set(ref(db, 'feedbacks'), null); // Purge aussi les retours
+            await set(ref(db, 'feedbacks'), null); 
             alert("🗑️ Base de données réinitialisée !"); 
             showPodium(); 
         } catch (error) { alert("Erreur lors de la réinitialisation."); }
@@ -1459,7 +1507,7 @@ function exportQuestionsPDF() {
 }
 
 // ==========================================
-// ECRAN DE VEILLE (INACTIVITÉ)
+// ECRAN DE VEILLE ET ÉCOUTEUR CLAVIER
 // ==========================================
 function resetIdleTimer() { 
     clearTimeout(idleTimer); 
@@ -1506,12 +1554,9 @@ function hideScreensaver() {
     resetIdleTimer(); 
 }
 
-// Lancement au chargement de la page
 resetIdleTimer();
 
-// ==========================================
-// SUPER ÉCOUTEUR CLAVIER (FOCUS DYNAMIQUE)
-// ==========================================
+// L'écouteur global du clavier, corrigé pour empêcher la touche Entrée de valider en arrière-plan
 document.addEventListener('keydown', function(e) {
     const activeScreen = document.querySelector('.active-screen'); 
     const screensaver = document.getElementById('screensaver');
@@ -1521,7 +1566,6 @@ document.addEventListener('keydown', function(e) {
         return; 
     }
     
-    // ETAT DES MODALES
     const isPasswordOpen = document.getElementById('password-modal').classList.contains('show');
     const isPseudoChoiceOpen = document.getElementById('pseudo-choice-modal').classList.contains('show');
     const isDetailsOpen = document.getElementById('details-modal').classList.contains('show');
@@ -1542,7 +1586,6 @@ document.addEventListener('keydown', function(e) {
     }
     
     if (e.key === 'Enter') { 
-        // L'Entrée gère intelligemment la priorité des fenêtres pour éviter les bugs !
         if (isPasswordOpen) {
             document.getElementById('submit-pwd-btn').click();
             return;
@@ -1568,7 +1611,6 @@ document.addEventListener('keydown', function(e) {
         } 
     }
     
-    // FLÈCHES DU CLAVIER (Navigation dans les réponses)
     if (activeScreen && activeScreen.id === 'screen-game' && !anyModalOpen) {
         if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
             e.preventDefault(); 
