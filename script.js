@@ -5,7 +5,6 @@
 // ==========================================
 const ADMIN_PASSWORD = "iutgeii"; 
 
-// Coefficients de difficulté appliqués aux points
 const DIFF_WEIGHTS = { 
     "Com": 0.75, 
     "STI": 1, 
@@ -13,7 +12,6 @@ const DIFF_WEIGHTS = {
     "BU2": 1.5 
 };
 
-// Traduction visuelle des catégories pour les joueurs (Pastilles & Excel)
 const DIFF_LABELS = { 
     "Com": "CG", 
     "STI": "STI2D", 
@@ -69,7 +67,9 @@ let modalChartInstance = null;
 let currentViewingPlayerId = null; 
 let isDemoMode = false; 
 let currentAssignedNum = null; 
-let currentScoreId = null; // CLÉ UNIQUE ANTI-DOUBLONS
+
+// 🔥 GESTION DES DOUBLONS DE NOMS SUR LE PODIUM
+let currentScoreId = null; 
 
 const AudioContextClass = window.AudioContext || window.webkitAudioContext;
 let audioCtx;
@@ -91,7 +91,7 @@ window.showScreensaver = showScreensaver;
 window.hideScreensaver = hideScreensaver;
 window.goToNextQuestion = goToNextQuestion; 
 window.togglePasswordVisibility = togglePasswordVisibility;
-window.togglePlayerPasswordVisibility = togglePlayerPasswordVisibility;
+window.togglePlayerPasswordVisibility = togglePlayerPasswordVisibility; 
 window.generatePlayerPDF = generatePlayerPDF; 
 window.generateAdminPDF = generateAdminPDF;
 window.openQuestionEditor = openQuestionEditor; 
@@ -114,7 +114,7 @@ window.showPseudoInput = showPseudoInput;
 window.savePseudoChoice = savePseudoChoice;
 window.submitSurveyAndGoToPodium = submitSurveyAndGoToPodium;
 window.exportSurveyExcel = exportSurveyExcel;
-
+window.exportQuestionsPDF = exportQuestionsPDF;
 
 // ==========================================
 // LIAISONS SÉCURISÉES DE LA TOUCHE ENTRÉE
@@ -155,10 +155,10 @@ if(surveyScreenNode) {
     });
 }
 
+// ==========================================
+// DÉFINITION DES FONCTIONS
+// ==========================================
 
-// ==========================================
-// INITIALISATION DE LA BASE DE DONNÉES
-// ==========================================
 async function loadQuestionsFromFirebase() {
     try {
         const snap = await get(ref(db, 'questions'));
@@ -172,7 +172,7 @@ async function loadQuestionsFromFirebase() {
                 tempDB = Object.values(rawData);
             }
             
-            // Bouclier Anti-Crash
+            // Bouclier Anti-Crash 
             dynamicDB = tempDB.filter(q => q !== null && q !== undefined && typeof q === 'object' && q.q && q.cat);
             
         } else {
@@ -189,10 +189,6 @@ async function loadQuestionsFromFirebase() {
 }
 loadQuestionsFromFirebase();
 
-
-// ==========================================
-// UTILITAIRES ET SÉCURITÉ
-// ==========================================
 function askPassword(customTitle = "⚠️ ZONE SÉCURISÉE ⚠️", customDesc = "Veuillez entrer le mot de passe :") {
     return new Promise((resolve) => {
         const modal = document.getElementById('password-modal');
@@ -360,10 +356,6 @@ function slideTo(screenId) {
     nextScreen.classList.add('active-screen');
 }
 
-
-// ==========================================
-// GESTION DU CYCLE DE JEU
-// ==========================================
 function goToStart() {
     isDemoMode = false;
     currentScoreId = null;
@@ -753,7 +745,6 @@ function goToNextQuestion() {
     }
 }
 
-
 // ==========================================
 // RÉSULTATS, RADAR ET SAUVEGARDE
 // ==========================================
@@ -904,7 +895,6 @@ function saveScoreFirebase(name, totalScore, profil, pin, pNum) {
     });
 }
 
-
 // ==========================================
 // CHOIX DU PSEUDO & QUESTIONNAIRE
 // ==========================================
@@ -934,7 +924,7 @@ async function savePseudoChoice() {
     if (input !== "") {
         let cleanName = sanitizeString(input);
         try {
-            // Mise à jour sécurisée via la clé unique
+            // Modification sécurisée par ciblage direct de la clé
             if (currentScoreId) {
                 await set(ref(db, `scores/${currentScoreId}/Candidat`), cleanName);
                 playerName = cleanName; 
@@ -1138,9 +1128,7 @@ async function changePlayerPassword(playerId) {
 function closeModal(modalId) { 
     if(modalId) {
         let m = document.getElementById(modalId);
-        if(m) {
-            m.classList.remove('show'); 
-        }
+        if(m) m.classList.remove('show'); 
     } else {
         document.querySelectorAll('.modal-content').forEach(m => {
             m.parentElement.classList.remove('show');
@@ -1199,7 +1187,7 @@ async function resetPodium() {
 }
 
 // ==========================================
-// EXPORTS EXCEL ET PDF (JOUEUR)
+// EXPORTS EXCEL / PDF
 // ==========================================
 async function downloadExcel() {
     closeModal('admin-hub-modal');
@@ -1467,6 +1455,52 @@ async function generateAdminPDF() {
     }
 }
 
+// Fonction D'export Direct des questions (Sans fenêtre filtre pour éviter les bugs !)
+function exportQuestionsPDF() {
+    closeModal('admin-hub-modal');
+    
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('landscape');
+    
+    doc.setFont("helvetica", "bold"); 
+    doc.setFontSize(16);
+    doc.text("BASE DE DONNÉES DES QUESTIONS GEII", 14, 15);
+    
+    let tableData = [];
+    
+    let sortedDB = [...dynamicDB].sort((a, b) => {
+        if (a.cat === b.cat) return a.diff.localeCompare(b.diff);
+        return a.cat.localeCompare(b.cat);
+    });
+
+    sortedDB.forEach(q => { 
+        tableData.push([ 
+            q.cat, 
+            DIFF_LABELS[q.diff] || q.diff, 
+            q.q, 
+            q.opt[q.ans], 
+            q.trivia 
+        ]); 
+    }); 
+    
+    doc.autoTable({
+        startY: 25,
+        head: [['Catégorie', 'Difficulté', 'Question', 'Bonne Réponse', 'Le Saviez-vous ?']],
+        body: tableData,
+        headStyles: { fillColor: [52, 152, 219] },
+        styles: { fontSize: 9 },
+        columnStyles: { 
+            0: { cellWidth: 20 }, 
+            1: { cellWidth: 20 }, 
+            2: { cellWidth: 80 }, 
+            3: { cellWidth: 50 },
+            4: { cellWidth: 90 }
+        }
+    });
+
+    doc.save(`Questions_GEII.pdf`);
+}
+
 // ==========================================
 // EDITEUR DE QUESTIONS (ADMIN)
 // ==========================================
@@ -1591,9 +1625,7 @@ async function saveQuestion(index) {
     let ans = 0; 
     
     for(let i=0; i<ansRadios.length; i++) { 
-        if(ansRadios[i].checked) {
-            ans = parseInt(ansRadios[i].value); 
-        }
+        if(ansRadios[i].checked) ans = parseInt(ansRadios[i].value); 
     }
     
     dynamicDB[index] = { 
@@ -1622,7 +1654,7 @@ async function saveQuestion(index) {
 
 
 // ==========================================
-// ECRAN DE VEILLE ET ÉCOUTEUR CLAVIER
+// ECRAN DE VEILLE ET ÉCOUTEUR CLAVIER GLOBAL
 // ==========================================
 function resetIdleTimer() { 
     clearTimeout(idleTimer); 
@@ -1671,6 +1703,7 @@ function hideScreensaver() {
 
 resetIdleTimer();
 
+// L'Écouteur clavier (Entrée / Echap / Flèches) avec sécurité anti-superposition
 document.addEventListener('keydown', function(e) {
     const activeScreen = document.querySelector('.active-screen'); 
     const screensaver = document.getElementById('screensaver');
