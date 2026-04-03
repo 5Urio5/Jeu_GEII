@@ -5,7 +5,6 @@
 // ==========================================
 const ADMIN_PASSWORD = "iutgeii"; 
 
-// Coefficients de difficulté appliqués aux points
 const DIFF_WEIGHTS = { 
     "Com": 0.75, 
     "STI": 1, 
@@ -13,7 +12,6 @@ const DIFF_WEIGHTS = {
     "BU2": 1.5 
 };
 
-// Traduction visuelle des catégories pour les joueurs (Pastilles & Excel)
 const DIFF_LABELS = { 
     "Com": "CG", 
     "STI": "STI2D", 
@@ -61,6 +59,7 @@ let totalQuestions = 30;
 let timeLimit = 30; 
 let timeLeft = timeLimit;
 let timerInterval; 
+
 let idleTimer; 
 const IDLE_TIME = 120000; 
 
@@ -72,6 +71,7 @@ let currentViewingPlayerId = null;
 
 let isDemoMode = false; 
 let currentAssignedNum = null; 
+// 🔥 CLÉ UNIQUE POUR EMPÊCHER LES DOUBLONS SUR LE PODIUM
 let currentScoreId = null; 
 
 const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -94,7 +94,7 @@ window.showScreensaver = showScreensaver;
 window.hideScreensaver = hideScreensaver;
 window.goToNextQuestion = goToNextQuestion; 
 window.togglePasswordVisibility = togglePasswordVisibility;
-window.togglePlayerPasswordVisibility = togglePlayerPasswordVisibility;
+window.togglePlayerPasswordVisibility = togglePlayerPasswordVisibility; 
 window.generatePlayerPDF = generatePlayerPDF; 
 window.generateAdminPDF = generateAdminPDF;
 window.openQuestionEditor = openQuestionEditor; 
@@ -110,6 +110,7 @@ window.editPseudo = editPseudo;
 window.changePlayerPassword = changePlayerPassword;
 window.openAdminHub = openAdminHub;
 window.startDemoMode = startDemoMode;
+window.exportQuestionsPDF = exportQuestionsPDF;
 window.renderEditorList = renderEditorList;
 window.openPseudoChoiceModal = openPseudoChoiceModal;
 window.skipPseudoChoice = skipPseudoChoice;
@@ -160,7 +161,6 @@ if(surveyScreenNode) {
     });
 }
 
-
 // ==========================================
 // INITIALISATION DE LA BASE DE DONNÉES
 // ==========================================
@@ -177,7 +177,7 @@ async function loadQuestionsFromFirebase() {
                 tempDB = Object.values(rawData);
             }
             
-            // Bouclier Anti-Crash : On filtre drastiquement les lignes vides
+            // Bouclier Anti-Crash : On retire les lignes vides ou effacées
             dynamicDB = tempDB.filter(q => q !== null && q !== undefined && typeof q === 'object' && q.q && q.cat);
             
         } else {
@@ -402,16 +402,12 @@ function goToStart() {
         pinInput.value = '';
         pinInput.type = 'password';
         let togglePlayerBtn = document.getElementById('toggle-player-pwd-btn');
-        if (togglePlayerBtn) {
-            togglePlayerBtn.innerText = '👁️';
-        }
+        if (togglePlayerBtn) togglePlayerBtn.innerText = '👁️';
     }
     
     for(let i = 1; i <= 5; i++) {
         let qElement = document.getElementById('survey-q' + i);
-        if(qElement) {
-            qElement.value = "";
-        }
+        if(qElement) qElement.value = "";
     }
 
     slideTo('screen-start');
@@ -985,6 +981,7 @@ async function showResultsFinal() {
 }
 
 function saveScoreFirebase(name, totalScore, profil, pin, pNum) {
+    // 🔥 RÉSOLUTION DU DOUBLON : On sauvegarde la clé générée par Firebase
     const newRef = push(ref(db, 'scores'));
     currentScoreId = newRef.key;
     
@@ -1037,6 +1034,7 @@ async function savePseudoChoice() {
         let cleanName = sanitizeString(input);
         try {
             if (currentScoreId) {
+                // On met à jour directement l'identifiant exact de la partie !
                 await set(ref(db, `scores/${currentScoreId}/Candidat`), cleanName);
                 playerName = cleanName; 
             }
@@ -1155,9 +1153,7 @@ async function openModal(playerId) {
         );
         
         if (pwd !== ADMIN_PASSWORD && pwd !== player.PIN) {
-            if (pwd !== null) {
-                alert("❌ Mot de passe incorrect.");
-            }
+            if (pwd !== null) alert("❌ Mot de passe incorrect.");
             return; 
         }
 
@@ -1604,6 +1600,7 @@ async function generateAdminPDF() {
     }
 }
 
+
 // ==========================================
 // EDITEUR DE QUESTIONS (ADMIN)
 // ==========================================
@@ -1851,8 +1848,9 @@ function generateQuestionsPDF() {
     closeModal('export-questions-modal');
 }
 
+
 // ==========================================
-// ECRAN DE VEILLE
+// ECRAN DE VEILLE ET ÉCOUTEUR CLAVIER GLOBAL
 // ==========================================
 function resetIdleTimer() { 
     clearTimeout(idleTimer); 
@@ -1901,7 +1899,7 @@ function hideScreensaver() {
 
 resetIdleTimer();
 
-// L'écouteur global pour empêcher les touches "Entrée" de déborder (sans casser les modales isolées)
+// L'Écouteur clavier (Entrée / Echap / Flèches) avec sécurité anti-superposition
 document.addEventListener('keydown', function(e) {
     const activeScreen = document.querySelector('.active-screen'); 
     const screensaver = document.getElementById('screensaver');
@@ -1935,6 +1933,7 @@ document.addEventListener('keydown', function(e) {
     }
     
     if (e.key === 'Enter') { 
+        // Si une modale est ouverte ou un champ de texte est sélectionné, l'écouteur global s'arrête ici
         if (anyModalOpen || document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') {
             return; 
         }

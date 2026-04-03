@@ -175,7 +175,7 @@
         <button class="main-btn" onclick="goToStart()">RETOUR AU MENU</button>
     </div>
 
-    <div id="details-modal">
+    <div id="details-modal" class="hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 10000; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.3s;">
         <div class="modal-content">
             <span class="close-btn" onclick="closeModal('details-modal')">&times;</span>
             <div id="modal-header-content"></div>
@@ -205,7 +205,7 @@
         </div>
     </div>
 
-    <div id="admin-hub-modal">
+    <div id="admin-hub-modal" class="hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 10000; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.3s;">
         <div class="modal-content" style="max-width: 600px; text-align: center;">
             <span class="close-btn" onclick="closeModal('admin-hub-modal')">&times;</span>
             <h1 style="color:#f1c40f; margin-top: 0;">⚙️ TABLEAU DE BORD</h1>
@@ -213,7 +213,7 @@
             
             <div style="display: flex; flex-direction: column; gap: 15px;">
                 <button class="secondary-btn" style="background-color: #3498db;" onclick="openQuestionEditor()">📝 Gérer les questions</button>
-                <button class="secondary-btn" style="background-color: #e67e22;" onclick="exportQuestionsPDF()">📄 Exporter les questions (PDF)</button>
+                <button class="secondary-btn" style="background-color: #e67e22;" onclick="openExportQuestionsModal()">📄 Exporter les questions (PDF)</button>
                 <button class="secondary-btn" style="background-color: #2ecc71;" onclick="downloadExcel()">📊 Exporter les scores (Excel)</button>
                 <button class="secondary-btn" style="background-color: #9b59b6;" onclick="exportSurveyExcel()">📉 Exporter la Satisfaction (Excel)</button>
                 <button class="secondary-btn" style="background-color: #f1c40f; color: #2c3e50;" onclick="startDemoMode()">🤖 Lancer une Partie Démo</button>
@@ -222,7 +222,7 @@
         </div>
     </div>
 
-    <div id="editor-modal">
+    <div id="editor-modal" class="hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 10000; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.3s;">
         <div class="modal-content" style="max-width: 1000px;">
             <span class="close-btn" onclick="closeModal('editor-modal')">&times;</span>
             <h2 style="color:#f1c40f; margin-top:0;">Gérer les Questions (Base de données)</h2>
@@ -263,7 +263,7 @@
         </div>
     </div>
 
-    <div id="export-questions-modal">
+    <div id="export-questions-modal" class="hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 10000; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.3s;">
         <div class="modal-content pwd-modal-box">
             <span class="close-btn" onclick="closeModal('export-questions-modal')">&times;</span>
             <h2 style="color:#f1c40f; margin-top: 0;">Exporter les Questions</h2>
@@ -285,7 +285,7 @@
         </div>
     </div>
 
-    <div id="password-modal">
+    <div id="password-modal" class="hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 10000; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.3s;">
         <div class="modal-content pwd-modal-box">
             <h2 id="pwd-modal-title" style="color:#f1c40f; margin-top: 0;">⚠️ ZONE SÉCURISÉE ⚠️</h2>
             <p id="pwd-modal-desc" style="font-size: 1.2em; margin-bottom: 20px;">Veuillez entrer le mot de passe :</p>
@@ -300,7 +300,7 @@
         </div>
     </div>
 
-    <div id="pseudo-choice-modal">
+    <div id="pseudo-choice-modal" class="hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 10000; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.3s;">
         <div class="modal-content pwd-modal-box">
             <h2 style="color:#3498db; margin-top: 0;">Publication des résultats</h2>
             

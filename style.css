@@ -153,12 +153,9 @@ th, td { padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.2); vert
 .details-chart-container { padding: 10px; width: 250px; height: 250px; }
 #best-path { font-size: 1.4em !important; white-space: nowrap; overflow: hidden; }
 
-#details-modal, #editor-modal, #password-modal, #admin-hub-modal, #pseudo-choice-modal, #export-questions-modal {
-    position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 10000;
-    display: flex; align-items: center; justify-content: center;
-    opacity: 0; pointer-events: none; transition: opacity 0.3s;
-}
-#details-modal.show, #editor-modal.show, #password-modal.show, #admin-hub-modal.show, #pseudo-choice-modal.show, #export-questions-modal.show { opacity: 1; pointer-events: auto; }
+/* Correction Modales */
+.show { opacity: 1 !important; pointer-events: auto !important; }
+
 .modal-content {
     background: #1c2541; width: 95%; max-width: 800px; max-height: 85vh;
     border-radius: 15px; padding: 25px; overflow-y: auto; box-sizing: border-box;
