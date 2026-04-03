@@ -5,6 +5,7 @@
 // ==========================================
 const ADMIN_PASSWORD = "iutgeii"; 
 
+// Coefficients de difficulté appliqués aux points
 const DIFF_WEIGHTS = { 
     "Com": 0.75, 
     "STI": 1, 
@@ -12,6 +13,7 @@ const DIFF_WEIGHTS = {
     "BU2": 1.5 
 };
 
+// Traduction visuelle des catégories pour les joueurs (Pastilles & Excel)
 const DIFF_LABELS = { 
     "Com": "CG", 
     "STI": "STI2D", 
@@ -48,18 +50,15 @@ let playerName = "";
 let playerPin = ""; 
 let currentQuestions = []; 
 let currentQIndex = 0;
-
 let scoresPoints = {AII: 0, EME: 0, ESE: 0}; 
 let scoresCount = {AII: 0, EME: 0, ESE: 0};
 let scoreTotal = 0; 
 let currentStreak = 0; 
 let playerSessionDetails = []; 
-
 let totalQuestions = 30; 
 let timeLimit = 30; 
 let timeLeft = timeLimit;
 let timerInterval; 
-
 let idleTimer; 
 const IDLE_TIME = 120000; 
 
@@ -68,11 +67,9 @@ let isDbLoaded = false;
 let resultsChartInstance = null;
 let modalChartInstance = null;
 let currentViewingPlayerId = null; 
-
 let isDemoMode = false; 
 let currentAssignedNum = null; 
-// 🔥 CLÉ UNIQUE POUR EMPÊCHER LES DOUBLONS SUR LE PODIUM
-let currentScoreId = null; 
+let currentScoreId = null; // CLÉ UNIQUE ANTI-DOUBLONS
 
 const AudioContextClass = window.AudioContext || window.webkitAudioContext;
 let audioCtx;
@@ -94,7 +91,7 @@ window.showScreensaver = showScreensaver;
 window.hideScreensaver = hideScreensaver;
 window.goToNextQuestion = goToNextQuestion; 
 window.togglePasswordVisibility = togglePasswordVisibility;
-window.togglePlayerPasswordVisibility = togglePlayerPasswordVisibility; 
+window.togglePlayerPasswordVisibility = togglePlayerPasswordVisibility;
 window.generatePlayerPDF = generatePlayerPDF; 
 window.generateAdminPDF = generateAdminPDF;
 window.openQuestionEditor = openQuestionEditor; 
@@ -110,7 +107,6 @@ window.editPseudo = editPseudo;
 window.changePlayerPassword = changePlayerPassword;
 window.openAdminHub = openAdminHub;
 window.startDemoMode = startDemoMode;
-window.exportQuestionsPDF = exportQuestionsPDF;
 window.renderEditorList = renderEditorList;
 window.openPseudoChoiceModal = openPseudoChoiceModal;
 window.skipPseudoChoice = skipPseudoChoice;
@@ -118,8 +114,6 @@ window.showPseudoInput = showPseudoInput;
 window.savePseudoChoice = savePseudoChoice;
 window.submitSurveyAndGoToPodium = submitSurveyAndGoToPodium;
 window.exportSurveyExcel = exportSurveyExcel;
-window.openExportQuestionsModal = openExportQuestionsModal;
-window.generateQuestionsPDF = generateQuestionsPDF;
 
 
 // ==========================================
@@ -161,6 +155,7 @@ if(surveyScreenNode) {
     });
 }
 
+
 // ==========================================
 // INITIALISATION DE LA BASE DE DONNÉES
 // ==========================================
@@ -177,7 +172,7 @@ async function loadQuestionsFromFirebase() {
                 tempDB = Object.values(rawData);
             }
             
-            // Bouclier Anti-Crash : On retire les lignes vides ou effacées
+            // Bouclier Anti-Crash
             dynamicDB = tempDB.filter(q => q !== null && q !== undefined && typeof q === 'object' && q.q && q.cat);
             
         } else {
@@ -222,15 +217,8 @@ function askPassword(customTitle = "⚠️ ZONE SÉCURISÉE ⚠️", customDesc 
             input.onkeydown = null;
         };
         
-        submitBtn.onclick = () => { 
-            cleanup(); 
-            resolve(input.value); 
-        };
-        
-        cancelBtn.onclick = () => { 
-            cleanup(); 
-            resolve(null); 
-        };
+        submitBtn.onclick = () => { cleanup(); resolve(input.value); };
+        cancelBtn.onclick = () => { cleanup(); resolve(null); };
         
         input.onkeydown = (e) => { 
             if (e.key === 'Enter') { 
@@ -276,13 +264,7 @@ function togglePlayerPasswordVisibility() {
 function sanitizeString(str) {
     if(!str) return "";
     return str.replace(/[&<>'"]/g, function(tag) {
-        const charsToReplace = { 
-            '&': '&amp;', 
-            '<': '&lt;', 
-            '>': '&gt;', 
-            "'": '&#39;', 
-            '"': '&quot;' 
-        };
+        const charsToReplace = { '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' };
         return charsToReplace[tag] || tag;
     });
 }
@@ -293,12 +275,8 @@ function setRandomBackground() {
 }
 
 function playSound(type) {
-    if (!audioCtx) {
-        audioCtx = new AudioContextClass();
-    }
-    if (audioCtx.state === 'suspended') {
-        audioCtx.resume();
-    }
+    if (!audioCtx) audioCtx = new AudioContextClass();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
     
     const osc = audioCtx.createOscillator(); 
     const gain = audioCtx.createGain();
@@ -363,10 +341,7 @@ function playSound(type) {
 
 function slideTo(screenId) {
     const active = document.querySelector('.active-screen');
-    
-    if (active && active.id === screenId) {
-        return; 
-    }
+    if (active && active.id === screenId) return; 
     
     if (active) { 
         active.classList.remove('active-screen'); 
@@ -380,9 +355,7 @@ function slideTo(screenId) {
     const nextScreen = document.getElementById(screenId); 
     nextScreen.classList.remove('hidden'); 
     nextScreen.classList.add('slide-in-right'); 
-    
     void nextScreen.offsetWidth; 
-    
     nextScreen.classList.remove('slide-in-right'); 
     nextScreen.classList.add('active-screen');
 }
@@ -420,9 +393,7 @@ async function cancelQuiz() {
         if (currentAssignedNum !== null) {
             try { 
                 await set(ref(db, `metadata/usedIds/${currentAssignedNum}`), null); 
-            } catch(e) {
-                console.error(e);
-            }
+            } catch(e) {}
             currentAssignedNum = null;
         }
         
@@ -437,7 +408,6 @@ function getRandom(arr, n) {
 
 async function openAdminHub() {
     let pwd = await askPassword("🔒 ESPACE ADMINISTRATEUR", "Veuillez entrer le mot de passe administrateur :");
-    
     if (pwd === ADMIN_PASSWORD) {
         document.getElementById('admin-hub-modal').classList.add('show');
     } else if (pwd !== null) {
@@ -452,12 +422,8 @@ function startDemoMode() {
 }
 
 async function startQuiz() {
-    if (!audioCtx) {
-        audioCtx = new AudioContextClass(); 
-    }
-    if (audioCtx.state === 'suspended') {
-        audioCtx.resume();
-    }
+    if (!audioCtx) audioCtx = new AudioContextClass(); 
+    if (audioCtx.state === 'suspended') audioCtx.resume();
 
     if (!isDbLoaded) {
         alert("⚠️ Connexion à la base de données en cours... Veuillez patienter quelques secondes.");
@@ -476,7 +442,6 @@ async function startQuiz() {
         let togglePlayerBtn = document.getElementById('toggle-player-pwd-btn');
         if (togglePlayerBtn) togglePlayerBtn.innerText = '👁️';
     }
-    
     for(let i = 1; i <= 5; i++) {
         let qElement = document.getElementById('survey-q' + i);
         if(qElement) qElement.value = "";
@@ -492,19 +457,16 @@ async function startQuiz() {
     currentScoreId = null;
 
     let selected = [];
-    
     ['AII', 'EME', 'ESE'].forEach(cat => {
         let catQ = dynamicDB.filter(q => q.cat === cat);
         let qCom = getRandom(catQ.filter(q => q.diff === "Com"), 2);
         let qSTI = getRandom(catQ.filter(q => q.diff === "STI"), 3);
         let qBU1 = getRandom(catQ.filter(q => q.diff === "BU1"), 3);
         let qBU2 = getRandom(catQ.filter(q => q.diff === "BU2"), 2);
-        
         selected = selected.concat(qCom, qSTI, qBU1, qBU2);
     });
 
     selected = selected.filter(q => q !== undefined && q !== null);
-    
     if (selected.length < 30) {
         let missingCount = 30 - selected.length;
         let remainingQuestions = dynamicDB.filter(q => !selected.includes(q));
@@ -557,41 +519,31 @@ async function startQuiz() {
         
         let progContainer = document.getElementById('progress-container'); 
         progContainer.innerHTML = '';
-        
         for(let i=0; i<totalQuestions; i++) { 
             let box = document.createElement('div');
             box.className = 'progress-box';
             box.id = `box-${i}`;
-            
             if (i < questionsToSimulate) {
-                if (playerSessionDetails[i].isCorrect) {
-                    box.classList.add('prog-correct');
-                } else {
-                    box.classList.add('prog-wrong');
-                }
+                if (playerSessionDetails[i].isCorrect) box.classList.add('prog-correct');
+                else box.classList.add('prog-wrong');
             }
-            
             progContainer.appendChild(box);
         }
         
         document.getElementById('player-display').innerHTML = `👤 ${playerName} <span style="margin-left:20px; color:#f1c40f;" id="live-score">${scoreTotal} pts</span>`;
         slideTo('screen-game'); 
         loadQuestion(); 
-        
         return; 
     }
 
     const idsRef = ref(db, 'metadata/usedIds');
-    
     try {
         await runTransaction(idsRef, (currentData) => {
             let data = currentData || {};
             let id = 1;
-            
             while (data[id.toString()]) {
                 id++;
             }
-            
             data[id.toString()] = true; 
             currentAssignedNum = id; 
             return data;
@@ -606,7 +558,6 @@ async function startQuiz() {
     
     let progContainer = document.getElementById('progress-container'); 
     progContainer.innerHTML = '';
-    
     for(let i=0; i<totalQuestions; i++) { 
         progContainer.innerHTML += `<div class="progress-box" id="box-${i}"></div>`; 
     }
@@ -625,7 +576,6 @@ function loadQuestion() {
     let timerBar = document.getElementById('timer-bar'); 
     timerBar.style.width = "100%"; 
     timerBar.style.backgroundColor = "#2ecc71"; 
-    
     document.getElementById('timer-text').innerText = `⏱️ ${timeLeft}s`;
 
     let qData = currentQuestions[currentQIndex];
@@ -658,11 +608,7 @@ function loadQuestion() {
         btn.className = 'answer-btn'; 
         btn.innerText = opt.text; 
         btn.dataset.idx = opt.originalIndex; 
-        
-        btn.onclick = (e) => {
-            processAnswer(opt.originalIndex, qData.ans, e.target);
-        };
-        
+        btn.onclick = (e) => processAnswer(opt.originalIndex, qData.ans, e.target);
         container.appendChild(btn);
     });
 
@@ -670,25 +616,16 @@ function loadQuestion() {
         timeLeft--; 
         document.getElementById('timer-text').innerText = `⏱️ ${timeLeft}s`;
         
-        if(timeLeft > 0 && timeLeft <= 10) {
-            playSound('fast-tick'); 
-        } else if (timeLeft > 10) {
-            playSound('tick');
-        }
+        if(timeLeft > 0 && timeLeft <= 10) playSound('fast-tick'); 
+        else if (timeLeft > 10) playSound('tick');
         
         let pct = (timeLeft / timeLimit) * 100; 
         timerBar.style.width = pct + "%";
         
-        if (pct < 50 && pct > 20) {
-            timerBar.style.backgroundColor = "#f1c40f"; 
-        }
-        if (pct <= 20) {
-            timerBar.style.backgroundColor = "#e74c3c"; 
-        }
+        if (pct < 50 && pct > 20) timerBar.style.backgroundColor = "#f1c40f"; 
+        if (pct <= 20) timerBar.style.backgroundColor = "#e74c3c"; 
 
-        if (timeLeft <= 0) {
-            processAnswer(-1, qData.ans, null); 
-        }
+        if (timeLeft <= 0) processAnswer(-1, qData.ans, null); 
     }, 1000);
 }
 
@@ -696,15 +633,12 @@ function processAnswer(selectedIndex, correctIndex, clickedBtn) {
     clearInterval(timerInterval);
     
     let allBtns = document.querySelectorAll('.answer-btn'); 
-    allBtns.forEach(b => {
-        b.disabled = true;
-    });
+    allBtns.forEach(b => b.disabled = true);
     
     let qData = currentQuestions[currentQIndex];
     let isTimeout = (selectedIndex === -1); 
     let isCorrect = (selectedIndex === correctIndex);
     let box = document.getElementById(`box-${currentQIndex}`); 
-    
     let timeTaken = timeLimit - timeLeft; 
     let pointsGained = 0;
     
@@ -712,11 +646,7 @@ function processAnswer(selectedIndex, correctIndex, clickedBtn) {
         scoresCount[qData.cat]++; 
         currentStreak++; 
         playSound('correct');
-        
-        if(clickedBtn) {
-            clickedBtn.classList.add('btn-correct'); 
-        }
-        
+        if(clickedBtn) clickedBtn.classList.add('btn-correct'); 
         box.classList.add('prog-correct');
         
         let basePoints = Math.round((timeLeft / timeLimit) * 500) + 500;
@@ -725,21 +655,13 @@ function processAnswer(selectedIndex, correctIndex, clickedBtn) {
         
         scoreTotal += pointsGained; 
         scoresPoints[qData.cat] += pointsGained;
-        
     } else {
         currentStreak = 0; 
         playSound(isTimeout ? 'timeout' : 'wrong');
-        
-        if(clickedBtn) {
-            clickedBtn.classList.add('btn-wrong'); 
-        }
-        
+        if(clickedBtn) clickedBtn.classList.add('btn-wrong'); 
         box.classList.add('prog-wrong');
-        
         allBtns.forEach(b => { 
-            if (parseInt(b.dataset.idx) === correctIndex) {
-                b.classList.add('btn-correct'); 
-            }
+            if (parseInt(b.dataset.idx) === correctIndex) b.classList.add('btn-correct'); 
         });
     }
     
@@ -797,7 +719,6 @@ function showIntermediateScreen(isCorrect, points, trivia, isTimeout) {
     document.getElementById('trivia-text').innerText = trivia; 
     
     let nextBtn = document.getElementById('next-question-btn');
-    
     if (currentQIndex === totalQuestions - 1) {
         nextBtn.innerText = "Voir mon résultat ➡️";
     } else {
@@ -812,13 +733,10 @@ function goToNextQuestion() {
     
     if (currentQIndex < totalQuestions) { 
         slideTo('screen-game'); 
-        setTimeout(() => {
-            loadQuestion();
-        }, 400); 
+        setTimeout(() => loadQuestion(), 400); 
     } else { 
         slideTo('screen-suspense'); 
         playSound('drumroll'); 
-        
         setTimeout(async () => { 
             document.getElementById('cp-player-name').innerText = playerName;
             
@@ -826,11 +744,8 @@ function goToNextQuestion() {
             if(pinInput) {
                 pinInput.value = '';
                 pinInput.type = 'password';
-                
                 let togglePlayerBtn = document.getElementById('toggle-player-pwd-btn');
-                if (togglePlayerBtn) {
-                    togglePlayerBtn.innerText = '👁️';
-                }
+                if (togglePlayerBtn) togglePlayerBtn.innerText = '👁️';
             }
             
             slideTo('screen-create-password');
@@ -844,10 +759,7 @@ function goToNextQuestion() {
 // ==========================================
 async function submitNewPassword() {
     let pinInput = document.getElementById('new-player-pin').value.trim();
-    
-    if (!pinInput) {
-        return alert("Hé ! Tu dois créer un mot de passe pour protéger tes résultats !");
-    }
+    if (!pinInput) return alert("Hé ! Tu dois créer un mot de passe pour protéger tes résultats !");
     
     playerPin = sanitizeString(pinInput); 
     
@@ -868,11 +780,7 @@ const customCanvasBackgroundColor = {
 };
 
 function calculateRadarData(sessionDetails) {
-    let stats = { 
-        AII: {maxPts:0, valPts:0}, 
-        EME: {maxPts:0, valPts:0}, 
-        ESE: {maxPts:0, valPts:0} 
-    };
+    let stats = { AII: {maxPts:0, valPts:0}, EME: {maxPts:0, valPts:0}, ESE: {maxPts:0, valPts:0} };
     
     sessionDetails.forEach(q => {
         let w = DIFF_WEIGHTS[q.diff] || 1; 
@@ -880,9 +788,7 @@ function calculateRadarData(sessionDetails) {
         
         if(stats[q.cat]) {
             stats[q.cat].maxPts += maxQPoints;
-            if(q.isCorrect) {
-                stats[q.cat].valPts += q.points;
-            }
+            if(q.isCorrect) stats[q.cat].valPts += q.points;
         }
     });
     
@@ -1004,13 +910,10 @@ function saveScoreFirebase(name, totalScore, profil, pin, pNum) {
 // ==========================================
 function openPseudoChoiceModal() {
     document.getElementById('pseudo-choice-display').innerText = playerName;
-    
     document.getElementById('optional-pseudo-input').style.display = 'none';
     document.getElementById('optional-pseudo-input').value = '';
-    
     document.getElementById('pseudo-buttons-step1').style.display = 'flex';
     document.getElementById('pseudo-buttons-step2').style.display = 'none';
-    
     document.getElementById('pseudo-choice-modal').classList.add('show');
 }
 
@@ -1023,26 +926,21 @@ function showPseudoInput() {
     document.getElementById('pseudo-buttons-step1').style.display = 'none';
     document.getElementById('optional-pseudo-input').style.display = 'block';
     document.getElementById('pseudo-buttons-step2').style.display = 'flex';
-    
     document.getElementById('optional-pseudo-input').focus();
 }
 
 async function savePseudoChoice() {
     let input = document.getElementById('optional-pseudo-input').value.trim();
-    
     if (input !== "") {
         let cleanName = sanitizeString(input);
         try {
+            // Mise à jour sécurisée via la clé unique
             if (currentScoreId) {
-                // On met à jour directement l'identifiant exact de la partie !
                 await set(ref(db, `scores/${currentScoreId}/Candidat`), cleanName);
                 playerName = cleanName; 
             }
-        } catch(e) { 
-            console.error(e); 
-        }
+        } catch(e) { console.error(e); }
     }
-    
     closeModal('pseudo-choice-modal');
     slideTo('screen-survey');
 }
@@ -1068,13 +966,10 @@ async function submitSurveyAndGoToPodium() {
             "Q5_Remarque": sanitizeString(q5),
             "Date": new Date().toLocaleDateString('fr-FR')
         });
-    } catch(e) { 
-        console.error("Erreur feedback", e); 
-    }
+    } catch(e) { console.error("Erreur feedback", e); }
 
     showPodium();
 }
-
 
 // ==========================================
 // PODIUM ET MODALE DÉTAILS
@@ -1168,13 +1063,9 @@ async function openModal(playerId) {
         allPlayers.forEach(p => {
             if(p.SessionDetails) { 
                 p.SessionDetails.forEach(q => { 
-                    if(!globalStats[q.q]) {
-                        globalStats[q.q] = { asked: 0, correct: 0 }; 
-                    }
+                    if(!globalStats[q.q]) globalStats[q.q] = { asked: 0, correct: 0 }; 
                     globalStats[q.q].asked++; 
-                    if(q.isCorrect) {
-                        globalStats[q.q].correct++; 
-                    }
+                    if(q.isCorrect) globalStats[q.q].correct++; 
                 }); 
             }
         });
@@ -1258,11 +1149,8 @@ function closeModal(modalId) {
 }
 
 async function toggleKeep(playerId, isChecked) { 
-    try { 
-        await set(ref(db, 'scores/' + playerId + '/keep'), isChecked); 
-    } catch (e) { 
-        console.error(e); 
-    } 
+    try { await set(ref(db, 'scores/' + playerId + '/keep'), isChecked); } 
+    catch (e) { console.error(e); } 
 }
 
 async function deletePlayerScore(playerId) {
@@ -1310,17 +1198,14 @@ async function resetPodium() {
     }
 }
 
-
 // ==========================================
-// EXPORTS EXCEL / PDF
+// EXPORTS EXCEL ET PDF (JOUEUR)
 // ==========================================
 async function downloadExcel() {
     closeModal('admin-hub-modal');
     try {
         const snapshot = await get(ref(db, 'scores')); 
-        if (!snapshot.exists()) {
-            return alert("Aucune donnée à exporter.");
-        }
+        if (!snapshot.exists()) return alert("Aucune donnée à exporter.");
         
         let dataPlayers = []; 
         let dataQuestions = []; 
@@ -1366,13 +1251,9 @@ async function downloadExcel() {
         allPlayers.forEach(p => {
             if (p.SessionDetails) { 
                 p.SessionDetails.forEach(q => { 
-                    if (!globalStats[q.q]) { 
-                        globalStats[q.q] = { cat: q.cat, asked: 0, correct: 0 }; 
-                    } 
+                    if (!globalStats[q.q]) { globalStats[q.q] = { cat: q.cat, asked: 0, correct: 0 }; } 
                     globalStats[q.q].asked++; 
-                    if (q.isCorrect) {
-                        globalStats[q.q].correct++; 
-                    }
+                    if (q.isCorrect) globalStats[q.q].correct++; 
                 }); 
             }
         });
@@ -1394,9 +1275,7 @@ async function downloadExcel() {
         const wb = window.XLSX.utils.book_new();
         window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(dataPlayers), "Classement");
         window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(dataQuestions), "Stats Questions");
-        if(dataDetails.length > 0) {
-            window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(dataDetails), "Détail Brut");
-        }
+        if(dataDetails.length > 0) window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(dataDetails), "Détail Brut");
         
         window.XLSX.writeFile(wb, "Resultats_GEII.xlsx");
     } catch (e) { 
@@ -1408,9 +1287,7 @@ async function exportSurveyExcel() {
     closeModal('admin-hub-modal');
     try {
         const snapshot = await get(ref(db, 'feedbacks')); 
-        if (!snapshot.exists()) {
-            return alert("Aucun retour de satisfaction enregistré pour le moment.");
-        }
+        if (!snapshot.exists()) return alert("Aucun retour de satisfaction enregistré pour le moment.");
         
         let dataFeedback = []; 
         const feedbackObj = snapshot.val(); 
@@ -1528,15 +1405,11 @@ function buildPDF(playerData, chartDataUrl) {
         doc.save(`Bilan_GEII_${playerData.Candidat}.pdf`);
     };
 
-    let logoLoaded = false; 
-    let logoDataUrl = null;
-    let qrLoaded = false; 
-    let qrDataUrl = null;
+    let logoLoaded = false; let logoDataUrl = null;
+    let qrLoaded = false; let qrDataUrl = null;
 
     const checkAllLoaded = () => { 
-        if(logoLoaded && qrLoaded) {
-            finalize(logoDataUrl, qrDataUrl); 
-        }
+        if(logoLoaded && qrLoaded) finalize(logoDataUrl, qrDataUrl); 
     };
 
     const imgLogo = new Image(); 
@@ -1556,10 +1429,7 @@ function buildPDF(playerData, chartDataUrl) {
         logoLoaded = true; 
         checkAllLoaded();
     };
-    imgLogo.onerror = () => { 
-        logoLoaded = true; 
-        checkAllLoaded(); 
-    };
+    imgLogo.onerror = () => { logoLoaded = true; checkAllLoaded(); };
 
     const imgQR = new Image(); 
     imgQR.src = "qr_code.png"; 
@@ -1572,10 +1442,7 @@ function buildPDF(playerData, chartDataUrl) {
         qrLoaded = true; 
         checkAllLoaded();
     };
-    imgQR.onerror = () => { 
-        qrLoaded = true; 
-        checkAllLoaded(); 
-    };
+    imgQR.onerror = () => { qrLoaded = true; checkAllLoaded(); };
 }
 
 function generatePlayerPDF() {
@@ -1599,7 +1466,6 @@ async function generateAdminPDF() {
         alert("Erreur lors de la récupération du joueur."); 
     }
 }
-
 
 // ==========================================
 // EDITEUR DE QUESTIONS (ADMIN)
@@ -1754,103 +1620,9 @@ async function saveQuestion(index) {
     }
 }
 
-function openExportQuestionsModal() {
-    closeModal('admin-hub-modal');
-    
-    let modal = document.getElementById('export-questions-modal');
-    if (!modal) {
-        const modalHTML = `
-        <div id="export-questions-modal" class="container hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 10000; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.3s;">
-            <div class="modal-content pwd-modal-box" style="background: #1c2541; width: 95%; max-width: 450px; border-radius: 15px; padding: 25px; text-align: center; position: relative;">
-                <span class="close-btn" onclick="closeModal('export-questions-modal')" style="position: absolute; top: 15px; right: 20px; font-size: 2.5em; cursor: pointer; color: white;">&times;</span>
-                <h2 style="color:#f1c40f; margin-top: 0;">Exporter les Questions</h2>
-                <p style="margin-bottom: 20px; font-size: 1.1em; color: white;">Choisissez les filtres pour l'exportation PDF :</p>
-                <select id="export-cat" class="editor-select" style="width: 100%; margin-bottom: 10px; font-size: 1em; padding: 8px; border-radius: 5px;">
-                    <option value="ALL">Toutes les catégories</option>
-                    <option value="AII">AII</option>
-                    <option value="EME">EME</option>
-                    <option value="ESE">ESE</option>
-                </select>
-                <select id="export-diff" class="editor-select" style="width: 100%; margin-bottom: 20px; font-size: 1em; padding: 8px; border-radius: 5px;">
-                    <option value="ALL">Toutes les difficultés</option>
-                    <option value="Com">CG</option>
-                    <option value="STI">STI2D</option>
-                    <option value="BU1">BUT1</option>
-                    <option value="BU2">BUT2</option>
-                </select>
-                <button class="main-btn" style="width: 100%; padding: 15px; background-color: #e67e22; color: white; font-weight: bold; border-radius: 10px; border: none; cursor: pointer;" onclick="generateQuestionsPDF()">Exporter en PDF</button>
-            </div>
-        </div>`;
-        document.body.insertAdjacentHTML('beforeend', modalHTML);
-        modal = document.getElementById('export-questions-modal');
-    }
-    
-    document.getElementById('export-cat').value = 'ALL';
-    document.getElementById('export-diff').value = 'ALL';
-    
-    modal.classList.remove('hidden');
-    void modal.offsetWidth;
-    modal.style.opacity = '1';
-    modal.style.pointerEvents = 'auto';
-    modal.classList.add('show');
-}
-
-function generateQuestionsPDF() {
-    let filterCat = document.getElementById('export-cat').value;
-    let filterDiff = document.getElementById('export-diff').value;
-
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF('landscape');
-    
-    doc.setFont("helvetica", "bold"); 
-    doc.setFontSize(16);
-    doc.text("BASE DE DONNÉES DES QUESTIONS GEII", 14, 15);
-    
-    let tableData = [];
-    
-    let filteredDB = dynamicDB.filter(q => {
-        if (filterCat !== 'ALL' && q.cat !== filterCat) return false;
-        if (filterDiff !== 'ALL' && q.diff !== filterDiff) return false;
-        return true;
-    });
-
-    let sortedDB = filteredDB.sort((a, b) => {
-        if (a.cat === b.cat) return a.diff.localeCompare(b.diff);
-        return a.cat.localeCompare(b.cat);
-    });
-
-    sortedDB.forEach(q => { 
-        tableData.push([ 
-            q.cat, 
-            DIFF_LABELS[q.diff] || q.diff, 
-            q.q, 
-            q.opt[q.ans], 
-            q.trivia 
-        ]); 
-    }); 
-    
-    doc.autoTable({
-        startY: 25,
-        head: [['Catégorie', 'Difficulté', 'Question', 'Bonne Réponse', 'Le Saviez-vous ?']],
-        body: tableData,
-        headStyles: { fillColor: [52, 152, 219] },
-        styles: { fontSize: 9 },
-        columnStyles: { 
-            0: { cellWidth: 20 }, 
-            1: { cellWidth: 20 }, 
-            2: { cellWidth: 80 }, 
-            3: { cellWidth: 50 },
-            4: { cellWidth: 90 }
-        }
-    });
-
-    doc.save(`Questions_GEII.pdf`);
-    closeModal('export-questions-modal');
-}
-
 
 // ==========================================
-// ECRAN DE VEILLE ET ÉCOUTEUR CLAVIER GLOBAL
+// ECRAN DE VEILLE ET ÉCOUTEUR CLAVIER
 // ==========================================
 function resetIdleTimer() { 
     clearTimeout(idleTimer); 
@@ -1899,7 +1671,6 @@ function hideScreensaver() {
 
 resetIdleTimer();
 
-// L'Écouteur clavier (Entrée / Echap / Flèches) avec sécurité anti-superposition
 document.addEventListener('keydown', function(e) {
     const activeScreen = document.querySelector('.active-screen'); 
     const screensaver = document.getElementById('screensaver');
@@ -1915,16 +1686,12 @@ document.addEventListener('keydown', function(e) {
     const isEditorOpen = document.getElementById('editor-modal').classList.contains('show');
     const isAdminHubOpen = document.getElementById('admin-hub-modal').classList.contains('show');
     
-    const exportModalNode = document.getElementById('export-questions-modal');
-    const isExportQOpen = exportModalNode && exportModalNode.classList.contains('show');
-    
-    const anyModalOpen = isPasswordOpen || isPseudoChoiceOpen || isDetailsOpen || isEditorOpen || isAdminHubOpen || isExportQOpen;
+    const anyModalOpen = isPasswordOpen || isPseudoChoiceOpen || isDetailsOpen || isEditorOpen || isAdminHubOpen;
 
     if (e.key === 'Escape') { 
         if (isDetailsOpen) closeModal('details-modal'); 
         else if (isEditorOpen) closeEditor(); 
         else if (isAdminHubOpen) closeModal('admin-hub-modal');
-        else if (isExportQOpen) closeModal('export-questions-modal');
         else if (isPasswordOpen) closeModal('password-modal');
         else if (isPseudoChoiceOpen) skipPseudoChoice();
         else if (activeScreen && (activeScreen.id === 'screen-game' || activeScreen.id === 'screen-intermediate')) { 
