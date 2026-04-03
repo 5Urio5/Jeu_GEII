@@ -20,7 +20,7 @@ const DIFF_LABELS = {
 };
 
 // ==========================================
-// FIREBASE - CONNEXION BASE DE DONNÉES TEMPS RÉEL
+// FIREBASE
 // ==========================================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-analytics.js";
@@ -48,7 +48,6 @@ let playerName = "";
 let playerPin = ""; 
 let currentQuestions = []; 
 let currentQIndex = 0;
-
 let scoresPoints = {AII: 0, EME: 0, ESE: 0}; 
 let scoresCount = {AII: 0, EME: 0, ESE: 0};
 let scoreTotal = 0; 
@@ -59,11 +58,11 @@ let totalQuestions = 30;
 let timeLimit = 30; 
 let timeLeft = timeLimit;
 let timerInterval; 
-
 let idleTimer; 
 const IDLE_TIME = 120000; 
 
 let dynamicDB = [];
+let isDbLoaded = false; // Sécurité de chargement
 let resultsChartInstance = null;
 let modalChartInstance = null;
 let currentViewingPlayerId = null; 
@@ -92,7 +91,7 @@ window.showScreensaver = showScreensaver;
 window.hideScreensaver = hideScreensaver;
 window.goToNextQuestion = goToNextQuestion; 
 window.togglePasswordVisibility = togglePasswordVisibility;
-window.togglePlayerPasswordVisibility = togglePlayerPasswordVisibility; 
+window.togglePlayerPasswordVisibility = togglePlayerPasswordVisibility;
 window.generatePlayerPDF = generatePlayerPDF; 
 window.generateAdminPDF = generateAdminPDF;
 window.openQuestionEditor = openQuestionEditor; 
@@ -128,23 +127,31 @@ async function loadQuestionsFromFirebase() {
         const snap = await get(ref(db, 'questions'));
         if (snap.exists()) {
             let rawData = snap.val();
+            let tempDB = [];
+            
+            // Firebase peut renvoyer un tableau troué ou un objet si on a effacé des IDs
             if (Array.isArray(rawData)) {
-                dynamicDB = rawData.filter(q => q !== null && q !== undefined && q.cat);
-            } else {
-                dynamicDB = Object.values(rawData).filter(q => q !== null && q !== undefined && q.cat);
+                tempDB = rawData;
+            } else if (typeof rawData === 'object') {
+                tempDB = Object.values(rawData);
             }
+            
+            // Bouclier Anti-Crash : On filtre drastiquement les lignes vides, null ou corrompues
+            dynamicDB = tempDB.filter(q => q !== null && q !== undefined && typeof q === 'object' && q.q && q.cat);
+            
         } else {
-            let localDB = (typeof DB !== 'undefined') ? DB : [];
+            let localDB = (typeof window.DB !== 'undefined') ? window.DB : (typeof DB !== 'undefined' ? DB : []);
             await set(ref(db, 'questions'), localDB);
             dynamicDB = localDB;
         }
     } catch (error) {
-        console.error("Erreur de chargement des questions, utilisation locale.", error);
-        dynamicDB = (typeof DB !== 'undefined') ? DB : []; 
+        console.error("Erreur Firebase, utilisation DB locale.", error);
+        dynamicDB = (typeof window.DB !== 'undefined') ? window.DB : (typeof DB !== 'undefined' ? DB : []); 
+    } finally {
+        isDbLoaded = true;
     }
 }
 loadQuestionsFromFirebase();
-
 
 // ==========================================
 // UTILITAIRES ET SÉCURITÉ
@@ -178,16 +185,12 @@ function askPassword(customTitle = "⚠️ ZONE SÉCURISÉE ⚠️", customDesc 
         
         input.onkeydown = (e) => { 
             if (e.key === 'Enter') { 
-                e.preventDefault();
-                e.stopPropagation();
-                cleanup(); 
-                resolve(input.value); 
+                e.preventDefault(); e.stopPropagation();
+                cleanup(); resolve(input.value); 
             } 
             if (e.key === 'Escape') { 
-                e.preventDefault();
-                e.stopPropagation();
-                cleanup(); 
-                resolve(null); 
+                e.preventDefault(); e.stopPropagation();
+                cleanup(); resolve(null); 
             }
         };
     });
@@ -197,11 +200,9 @@ function togglePasswordVisibility() {
     const input = document.getElementById('admin-pwd-input');
     const toggleBtn = document.getElementById('toggle-pwd-btn');
     if (input.type === 'password') { 
-        input.type = 'text'; 
-        toggleBtn.innerText = '🙈'; 
+        input.type = 'text'; toggleBtn.innerText = '🙈'; 
     } else { 
-        input.type = 'password'; 
-        toggleBtn.innerText = '👁️'; 
+        input.type = 'password'; toggleBtn.innerText = '👁️'; 
     }
 }
 
@@ -209,11 +210,9 @@ function togglePlayerPasswordVisibility() {
     const input = document.getElementById('new-player-pin');
     const toggleBtn = document.getElementById('toggle-player-pwd-btn');
     if (input.type === 'password') { 
-        input.type = 'text'; 
-        toggleBtn.innerText = '🙈'; 
+        input.type = 'text'; toggleBtn.innerText = '🙈'; 
     } else { 
-        input.type = 'password'; 
-        toggleBtn.innerText = '👁️'; 
+        input.type = 'password'; toggleBtn.innerText = '👁️'; 
     }
 }
 
@@ -243,55 +242,33 @@ function playSound(type) {
     const now = audioCtx.currentTime;
     
     if (type === 'correct') { 
-        osc.type = 'sine'; 
-        osc.frequency.setValueAtTime(880, now); 
-        osc.frequency.setValueAtTime(1046, now + 0.1); 
-        gain.gain.setValueAtTime(0.5, now); 
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3); 
-        osc.start(now); 
-        osc.stop(now + 0.3); 
+        osc.type = 'sine'; osc.frequency.setValueAtTime(880, now); osc.frequency.setValueAtTime(1046, now + 0.1); 
+        gain.gain.setValueAtTime(0.5, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3); 
+        osc.start(now); osc.stop(now + 0.3); 
     } 
     else if (type === 'wrong' || type === 'timeout') { 
-        osc.type = 'sawtooth'; 
-        osc.frequency.setValueAtTime(150, now); 
-        gain.gain.setValueAtTime(0.5, now); 
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4); 
-        osc.start(now); 
-        osc.stop(now + 0.4); 
+        osc.type = 'sawtooth'; osc.frequency.setValueAtTime(150, now); 
+        gain.gain.setValueAtTime(0.5, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4); 
+        osc.start(now); osc.stop(now + 0.4); 
     } 
     else if (type === 'fast-tick') { 
-        osc.type = 'square'; 
-        osc.frequency.setValueAtTime(800, now); 
-        gain.gain.setValueAtTime(0.1, now); 
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05); 
-        osc.start(now); 
-        osc.stop(now + 0.05); 
+        osc.type = 'square'; osc.frequency.setValueAtTime(800, now); 
+        gain.gain.setValueAtTime(0.1, now); gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05); 
+        osc.start(now); osc.stop(now + 0.05); 
     } 
     else if (type === 'tick') { 
-        osc.type = 'square'; 
-        osc.frequency.setValueAtTime(400, now); 
-        gain.gain.setValueAtTime(0.1, now); 
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05); 
-        osc.start(now); 
-        osc.stop(now + 0.05); 
+        osc.type = 'square'; osc.frequency.setValueAtTime(400, now); 
+        gain.gain.setValueAtTime(0.1, now); gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05); 
+        osc.start(now); osc.stop(now + 0.05); 
     } 
     else if (type === 'drumroll') { 
-        osc.type = 'sawtooth'; 
-        osc.frequency.setValueAtTime(60, now); 
-        const lfo = audioCtx.createOscillator(); 
-        lfo.type = 'sine'; 
-        lfo.frequency.value = 25; 
-        const lfoGain = audioCtx.createGain(); 
-        lfoGain.gain.value = 50; 
-        lfo.connect(lfoGain); 
-        lfoGain.connect(osc.frequency); 
-        lfo.start(now); 
-        lfo.stop(now + 3); 
-        gain.gain.setValueAtTime(0, now); 
-        gain.gain.linearRampToValueAtTime(0.5, now + 2); 
-        gain.gain.linearRampToValueAtTime(0, now + 3); 
-        osc.start(now); 
-        osc.stop(now + 3); 
+        osc.type = 'sawtooth'; osc.frequency.setValueAtTime(60, now); 
+        const lfo = audioCtx.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = 25; 
+        const lfoGain = audioCtx.createGain(); lfoGain.gain.value = 50; 
+        lfo.connect(lfoGain); lfoGain.connect(osc.frequency); 
+        lfo.start(now); lfo.stop(now + 3); 
+        gain.gain.setValueAtTime(0, now); gain.gain.linearRampToValueAtTime(0.5, now + 2); gain.gain.linearRampToValueAtTime(0, now + 3); 
+        osc.start(now); osc.stop(now + 3); 
     }
 }
 
@@ -326,6 +303,7 @@ function goToStart() {
     setRandomBackground(); 
     resetIdleTimer(); 
     
+    // Purge de l'écran du mot de passe
     let pinInput = document.getElementById('new-player-pin');
     if(pinInput) {
         pinInput.value = '';
@@ -334,6 +312,7 @@ function goToStart() {
         if (togglePlayerBtn) togglePlayerBtn.innerText = '👁️';
     }
     
+    // Purge complète du questionnaire de satisfaction
     for(let i = 1; i <= 5; i++) {
         let qElement = document.getElementById('survey-q' + i);
         if(qElement) qElement.value = "";
@@ -381,6 +360,17 @@ async function startQuiz() {
     if (!audioCtx) audioCtx = new AudioContextClass(); 
     if (audioCtx.state === 'suspended') audioCtx.resume();
 
+    // Vérification de sécurité pour le chargement
+    if (!isDbLoaded) {
+        alert("⚠️ Connexion à la base de données en cours... Veuillez patienter quelques secondes.");
+        return;
+    }
+    if (!dynamicDB || dynamicDB.length === 0) {
+        alert("❌ Erreur : Aucune question trouvée dans la base de données. Veuillez en ajouter depuis l'espace administrateur.");
+        return;
+    }
+
+    // Purge
     let pinInput = document.getElementById('new-player-pin');
     if(pinInput) {
         pinInput.value = '';
@@ -402,16 +392,9 @@ async function startQuiz() {
     currentAssignedNum = null;
     currentScoreId = null;
 
-    if (!dynamicDB || dynamicDB.length === 0) {
-        alert("⚠️ Les questions sont en cours de chargement. Veuillez patienter une seconde...");
-        return;
-    }
-
-    let safeDB = dynamicDB.filter(q => q !== null && q !== undefined && q.cat);
-    
     let selected = [];
     ['AII', 'EME', 'ESE'].forEach(cat => {
-        let catQ = safeDB.filter(q => q.cat === cat);
+        let catQ = dynamicDB.filter(q => q.cat === cat);
         let qCom = getRandom(catQ.filter(q => q.diff === "Com"), 2);
         let qSTI = getRandom(catQ.filter(q => q.diff === "STI"), 3);
         let qBU1 = getRandom(catQ.filter(q => q.diff === "BU1"), 3);
@@ -419,11 +402,11 @@ async function startQuiz() {
         selected = selected.concat(qCom, qSTI, qBU1, qBU2);
     });
 
-    selected = selected.filter(q => q !== null && q !== undefined);
-    
+    // Si on a moins de 30 questions parfaites, on comble les trous avec le reste de la base
+    selected = selected.filter(q => q !== undefined && q !== null);
     if (selected.length < 30) {
         let missingCount = 30 - selected.length;
-        let remainingQuestions = safeDB.filter(q => !selected.includes(q));
+        let remainingQuestions = dynamicDB.filter(q => !selected.includes(q));
         let fillQuestions = getRandom(remainingQuestions, missingCount);
         selected = selected.concat(fillQuestions);
     }
@@ -431,16 +414,12 @@ async function startQuiz() {
     currentQuestions = selected.sort(() => 0.5 - Math.random());
     totalQuestions = currentQuestions.length;
 
-    if (totalQuestions === 0) {
-        alert("❌ Erreur : Aucune question trouvée dans la base de données !");
-        return;
-    }
-
+    // SIMULATION MODE DÉMO
     if (isDemoMode) {
         isDemoMode = false; 
         playerName = "PlayerManon (Démo)";
         
-        let questionsToSimulate = totalQuestions - 1;
+        let questionsToSimulate = totalQuestions - 1; 
         
         for(let i = 0; i < questionsToSimulate; i++) {
             let q = currentQuestions[i];
@@ -490,6 +469,7 @@ async function startQuiz() {
         return; 
     }
 
+    // MODE NORMAL
     const idsRef = ref(db, 'metadata/usedIds');
     try {
         await runTransaction(idsRef, (currentData) => {
@@ -857,7 +837,6 @@ function saveScoreFirebase(name, totalScore, profil, pin, pNum) {
     });
 }
 
-
 // ==========================================
 // CHOIX DU PSEUDO & QUESTIONNAIRE
 // ==========================================
@@ -897,6 +876,39 @@ async function savePseudoChoice() {
     slideTo('screen-survey');
 }
 
+// LIEN DE LA TOUCHE ENTRÉE ISOLÉE (Pour les champs texte)
+const pinInputNode = document.getElementById('new-player-pin');
+if(pinInputNode) {
+    pinInputNode.addEventListener('keydown', function(e) {
+        if(e.key === 'Enter') {
+            e.preventDefault(); e.stopPropagation();
+            submitNewPassword();
+        }
+    });
+}
+
+const pseudoInputNode = document.getElementById('optional-pseudo-input');
+if(pseudoInputNode) {
+    pseudoInputNode.addEventListener('keydown', function(e) {
+        if(e.key === 'Enter') {
+            e.preventDefault(); e.stopPropagation();
+            savePseudoChoice();
+        }
+    });
+}
+
+const surveyScreenNode = document.getElementById('screen-survey');
+if(surveyScreenNode) {
+    surveyScreenNode.addEventListener('keydown', function(e) {
+        if(e.key === 'Enter') {
+            if (document.activeElement && document.activeElement.tagName === 'TEXTAREA') return;
+            e.preventDefault(); e.stopPropagation();
+            submitSurveyAndGoToPodium();
+        }
+    });
+}
+
+
 async function submitSurveyAndGoToPodium() {
     let q1 = document.getElementById('survey-q1').value;
     let q2 = document.getElementById('survey-q2').value;
@@ -923,9 +935,8 @@ async function submitSurveyAndGoToPodium() {
     showPodium();
 }
 
-
 // ==========================================
-// PODIUM ET MODALES
+// PODIUM ET MODALE DÉTAILS
 // ==========================================
 async function showPodium() {
     resetIdleTimer(); 
@@ -1088,11 +1099,26 @@ async function changePlayerPassword(playerId) {
     }
 }
 
+// Fonction de fermeture corrigée pour supporter les modales insérées dynamiquement
 function closeModal(modalId) { 
     if(modalId) {
-        document.getElementById(modalId).classList.remove('show'); 
+        let m = document.getElementById(modalId);
+        if(m) {
+            m.classList.remove('show'); 
+            if (m.style.opacity) {
+                m.style.opacity = '0';
+                m.style.pointerEvents = 'none';
+            }
+        }
     } else {
-        document.querySelectorAll('.modal-content').forEach(m => m.parentElement.classList.remove('show'));
+        document.querySelectorAll('.modal-content').forEach(m => {
+            let parent = m.parentElement;
+            parent.classList.remove('show');
+            if (parent.style.opacity) {
+                parent.style.opacity = '0';
+                parent.style.pointerEvents = 'none';
+            }
+        });
     }
 }
 
@@ -1144,7 +1170,7 @@ async function resetPodium() {
 
 
 // ==========================================
-// EXPORTS EXCEL / PDF
+// EXPORTS EXCEL ET PDF
 // ==========================================
 async function downloadExcel() {
     closeModal('admin-hub-modal');
@@ -1367,9 +1393,8 @@ function buildPDF(playerData, chartDataUrl) {
         canvas.getContext('2d').drawImage(imgLogo, 0, 0); 
         logoDataUrl = canvas.toDataURL('image/png');
         
-        let ratio = imgLogo.naturalWidth / imgLogo.naturalHeight;
         logoH = 18;
-        logoW = 18 * ratio;
+        logoW = 18 * (imgLogo.naturalWidth / imgLogo.naturalHeight);
         
         logoLoaded = true; 
         checkAllLoaded();
@@ -1411,7 +1436,6 @@ async function generateAdminPDF() {
         alert("Erreur lors de la récupération du joueur."); 
     }
 }
-
 
 // ==========================================
 // EDITEUR DE QUESTIONS (ADMIN)
@@ -1564,11 +1588,48 @@ async function saveQuestion(index) {
     }
 }
 
+// ==========================================
+// FENÊTRE ET EXPORT DES QUESTIONS EN PDF
+// ==========================================
 function openExportQuestionsModal() {
     closeModal('admin-hub-modal');
+    
+    let modal = document.getElementById('export-questions-modal');
+    if (!modal) {
+        const modalHTML = `
+        <div id="export-questions-modal" class="container hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 10000; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.3s;">
+            <div class="modal-content pwd-modal-box" style="background: #1c2541; width: 95%; max-width: 450px; border-radius: 15px; padding: 25px; text-align: center; position: relative;">
+                <span class="close-btn" onclick="closeModal('export-questions-modal')" style="position: absolute; top: 15px; right: 20px; font-size: 2.5em; cursor: pointer; color: white;">&times;</span>
+                <h2 style="color:#f1c40f; margin-top: 0;">Exporter les Questions</h2>
+                <p style="margin-bottom: 20px; font-size: 1.1em; color: white;">Choisissez les filtres pour l'exportation PDF :</p>
+                <select id="export-cat" class="editor-select" style="width: 100%; margin-bottom: 10px; font-size: 1em; padding: 8px; border-radius: 5px;">
+                    <option value="ALL">Toutes les catégories</option>
+                    <option value="AII">AII</option>
+                    <option value="EME">EME</option>
+                    <option value="ESE">ESE</option>
+                </select>
+                <select id="export-diff" class="editor-select" style="width: 100%; margin-bottom: 20px; font-size: 1em; padding: 8px; border-radius: 5px;">
+                    <option value="ALL">Toutes les difficultés</option>
+                    <option value="Com">CG</option>
+                    <option value="STI">STI2D</option>
+                    <option value="BU1">BUT1</option>
+                    <option value="BU2">BUT2</option>
+                </select>
+                <button class="main-btn" style="width: 100%; padding: 15px; background-color: #e67e22; color: white; font-weight: bold; border-radius: 10px; border: none; cursor: pointer;" onclick="generateQuestionsPDF()">Exporter en PDF</button>
+            </div>
+        </div>`;
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+        modal = document.getElementById('export-questions-modal');
+    }
+    
     document.getElementById('export-cat').value = 'ALL';
     document.getElementById('export-diff').value = 'ALL';
-    document.getElementById('export-questions-modal').classList.add('show');
+    
+    modal.classList.remove('hidden');
+    void modal.offsetWidth;
+    modal.style.opacity = '1';
+    modal.style.pointerEvents = 'auto';
+    modal.classList.add('show');
 }
 
 function generateQuestionsPDF() {
@@ -1624,8 +1685,9 @@ function generateQuestionsPDF() {
     closeModal('export-questions-modal');
 }
 
+
 // ==========================================
-// ECRAN DE VEILLE ET ÉCOUTEUR CLAVIER GLOBAL
+// ECRAN DE VEILLE ET ÉCOUTEUR CLAVIER
 // ==========================================
 function resetIdleTimer() { 
     clearTimeout(idleTimer); 
@@ -1674,7 +1736,7 @@ function hideScreensaver() {
 
 resetIdleTimer();
 
-// L'Écouteur clavier (Entrée / Echap / Flèches) avec sécurité anti-superposition
+// L'écouteur global pour empêcher les touches "Entrée" de déborder
 document.addEventListener('keydown', function(e) {
     const activeScreen = document.querySelector('.active-screen'); 
     const screensaver = document.getElementById('screensaver');
@@ -1689,7 +1751,9 @@ document.addEventListener('keydown', function(e) {
     const isDetailsOpen = document.getElementById('details-modal').classList.contains('show');
     const isEditorOpen = document.getElementById('editor-modal').classList.contains('show');
     const isAdminHubOpen = document.getElementById('admin-hub-modal').classList.contains('show');
-    const isExportQOpen = document.getElementById('export-questions-modal').classList.contains('show');
+    
+    const exportModalNode = document.getElementById('export-questions-modal');
+    const isExportQOpen = exportModalNode && exportModalNode.classList.contains('show');
     
     const anyModalOpen = isPasswordOpen || isPseudoChoiceOpen || isDetailsOpen || isEditorOpen || isAdminHubOpen || isExportQOpen;
 
@@ -1706,24 +1770,11 @@ document.addEventListener('keydown', function(e) {
     }
     
     if (e.key === 'Enter') { 
-        // Gestion des modales bloquantes
-        if (isPasswordOpen) {
-            document.getElementById('submit-pwd-btn').click();
-            return;
-        }
-        if (isPseudoChoiceOpen) {
-            if(document.getElementById('optional-pseudo-input').style.display === 'block'){
-                document.getElementById('pseudo-buttons-step2').querySelector('button').click();
-            } else {
-                document.getElementById('pseudo-buttons-step1').querySelectorAll('button')[1].click();
-            }
-            return;
-        }
-        if (anyModalOpen) {
+        // Si une modale est ouverte ou un champ de texte est sélectionné, l'écouteur global s'arrête ici
+        if (anyModalOpen || document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') {
             return; 
         }
 
-        // Navigation dans les écrans
         if (activeScreen) { 
             if (activeScreen.id === 'screen-start') {
                 startQuiz();
@@ -1733,7 +1784,6 @@ document.addEventListener('keydown', function(e) {
         } 
     }
     
-    // FLÈCHES DU CLAVIER (Navigation dans les réponses)
     if (activeScreen && activeScreen.id === 'screen-game' && !anyModalOpen) {
         if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
             e.preventDefault(); 
