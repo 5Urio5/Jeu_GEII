@@ -66,8 +66,10 @@ let dynamicDB = [];
 let resultsChartInstance = null;
 let modalChartInstance = null;
 let currentViewingPlayerId = null; 
+
 let isDemoMode = false; 
 let currentAssignedNum = null; 
+let currentScoreId = null; // CLÉ UNIQUE POUR EMPÊCHER LES DOUBLONS
 
 const AudioContextClass = window.AudioContext || window.webkitAudioContext;
 let audioCtx;
@@ -89,7 +91,7 @@ window.showScreensaver = showScreensaver;
 window.hideScreensaver = hideScreensaver;
 window.goToNextQuestion = goToNextQuestion; 
 window.togglePasswordVisibility = togglePasswordVisibility;
-window.togglePlayerPasswordVisibility = togglePlayerPasswordVisibility; // NOUVEAU
+window.togglePlayerPasswordVisibility = togglePlayerPasswordVisibility;
 window.generatePlayerPDF = generatePlayerPDF; 
 window.generateAdminPDF = generateAdminPDF;
 window.openQuestionEditor = openQuestionEditor; 
@@ -113,11 +115,13 @@ window.showPseudoInput = showPseudoInput;
 window.savePseudoChoice = savePseudoChoice;
 window.submitSurveyAndGoToPodium = submitSurveyAndGoToPodium;
 window.exportSurveyExcel = exportSurveyExcel;
+window.openExportQuestionsModal = openExportQuestionsModal;
+window.generateQuestionsPDF = generateQuestionsPDF;
+
 
 // ==========================================
-// DÉFINITION DES FONCTIONS
+// DÉFINITION DES FONCTIONS INITIALES
 // ==========================================
-
 async function loadQuestionsFromFirebase() {
     try {
         const snap = await get(ref(db, 'questions'));
@@ -176,7 +180,6 @@ function togglePasswordVisibility() {
     }
 }
 
-// NOUVEAU : Masquer/Afficher le mot de passe du Joueur
 function togglePlayerPasswordVisibility() {
     const input = document.getElementById('new-player-pin');
     const toggleBtn = document.getElementById('toggle-player-pwd-btn');
@@ -288,25 +291,30 @@ function slideTo(screenId) {
     nextScreen.classList.add('active-screen');
 }
 
+
+// ==========================================
+// GESTION DU CYCLE DE JEU
+// ==========================================
 function goToStart() {
     isDemoMode = false;
+    currentScoreId = null;
     setRandomBackground(); 
     resetIdleTimer(); 
     
-    // 🔥 NOUVEAU : Réinitialiser la zone du mot de passe
+    // Purge de l'écran du mot de passe
     let pinInput = document.getElementById('new-player-pin');
     if(pinInput) {
         pinInput.value = '';
         pinInput.type = 'password';
-        document.getElementById('toggle-player-pwd-btn').innerText = '👁️';
+        let togglePlayerBtn = document.getElementById('toggle-player-pwd-btn');
+        if (togglePlayerBtn) togglePlayerBtn.innerText = '👁️';
     }
     
-    // 🔥 NOUVEAU : Purger intégralement les données du questionnaire précédent
-    document.getElementById('survey-q1').value = "";
-    document.getElementById('survey-q2').value = "";
-    document.getElementById('survey-q3').value = "";
-    document.getElementById('survey-q4').value = "";
-    document.getElementById('survey-q5').value = "";
+    // Purge complète du questionnaire de satisfaction
+    for(let i = 1; i <= 5; i++) {
+        let qElement = document.getElementById('survey-q' + i);
+        if(qElement) qElement.value = "";
+    }
 
     slideTo('screen-start');
 }
@@ -315,9 +323,11 @@ async function cancelQuiz() {
     if (confirm("⚠️ Es-tu sûr de vouloir annuler la partie en cours ?\n\nTa progression ne sera pas sauvegardée et n'apparaîtra pas dans le classement. Tu perdras tout.")) {
         clearInterval(timerInterval); 
         
+        // Libération du numéro joueur généré si on annule en cours
         if (currentAssignedNum !== null) {
-            try { await set(ref(db, `metadata/usedIds/${currentAssignedNum}`), null); } 
-            catch(e) {}
+            try { 
+                await set(ref(db, `metadata/usedIds/${currentAssignedNum}`), null); 
+            } catch(e) {}
             currentAssignedNum = null;
         }
         
@@ -349,16 +359,18 @@ async function startQuiz() {
     if (!audioCtx) audioCtx = new AudioContextClass(); 
     if (audioCtx.state === 'suspended') audioCtx.resume();
 
-    // Réinitialisation des formulaires par sécurité
+    // Sécurité de purge supplémentaire au lancement du jeu
     let pinInput = document.getElementById('new-player-pin');
-    pinInput.value = '';
-    pinInput.type = 'password';
-    document.getElementById('toggle-player-pwd-btn').innerText = '👁️';
-    document.getElementById('survey-q1').value = "";
-    document.getElementById('survey-q2').value = "";
-    document.getElementById('survey-q3').value = "";
-    document.getElementById('survey-q4').value = "";
-    document.getElementById('survey-q5').value = "";
+    if(pinInput) {
+        pinInput.value = '';
+        pinInput.type = 'password';
+        let togglePlayerBtn = document.getElementById('toggle-player-pwd-btn');
+        if (togglePlayerBtn) togglePlayerBtn.innerText = '👁️';
+    }
+    for(let i = 1; i <= 5; i++) {
+        let qElement = document.getElementById('survey-q' + i);
+        if(qElement) qElement.value = "";
+    }
 
     playerPin = ""; 
     scoresPoints = {AII: 0, EME: 0, ESE: 0}; 
@@ -367,6 +379,7 @@ async function startQuiz() {
     currentStreak = 0; 
     playerSessionDetails = [];
     currentAssignedNum = null;
+    currentScoreId = null;
 
     let selected = [];
     ['AII', 'EME', 'ESE'].forEach(cat => {
@@ -379,7 +392,7 @@ async function startQuiz() {
     });
     currentQuestions = selected.sort(() => 0.5 - Math.random());
 
-    // SIMULATION MODE DÉMO
+    // SIMULATION MODE DÉMO (Option Administrateur)
     if (isDemoMode) {
         isDemoMode = false; 
         playerName = "PlayerManon (Démo)";
@@ -432,7 +445,7 @@ async function startQuiz() {
         return; 
     }
 
-    // MODE NORMAL 
+    // MODE NORMAL (Utilisation de la transaction pour PlayerXXXX)
     const idsRef = ref(db, 'metadata/usedIds');
     try {
         await runTransaction(idsRef, (currentData) => {
@@ -518,6 +531,7 @@ function loadQuestion() {
         
         let pct = (timeLeft / timeLimit) * 100; 
         timerBar.style.width = pct + "%";
+        
         if (pct < 50 && pct > 20) timerBar.style.backgroundColor = "#f1c40f"; 
         if (pct <= 20) timerBar.style.backgroundColor = "#e74c3c"; 
 
@@ -635,14 +649,23 @@ function goToNextQuestion() {
         playSound('drumroll'); 
         setTimeout(async () => { 
             document.getElementById('cp-player-name').innerText = playerName;
-            document.getElementById('new-player-pin').value = '';
+            
+            let pinInput = document.getElementById('new-player-pin');
+            if(pinInput) {
+                pinInput.value = '';
+                pinInput.type = 'password';
+                let togglePlayerBtn = document.getElementById('toggle-player-pwd-btn');
+                if (togglePlayerBtn) togglePlayerBtn.innerText = '👁️';
+            }
+            
             slideTo('screen-create-password');
         }, 3000); 
     }
 }
 
+
 // ==========================================
-// CRÉATION MOT DE PASSE ET RÉSULTATS
+// RÉSULTATS, RADAR ET SAUVEGARDE
 // ==========================================
 async function submitNewPassword() {
     let pinInput = document.getElementById('new-player-pin').value.trim();
@@ -774,7 +797,11 @@ async function showResultsFinal() {
 }
 
 function saveScoreFirebase(name, totalScore, profil, pin, pNum) {
-    push(ref(db, 'scores'), { 
+    // 🔥 RÉSOLUTION DU DOUBLON : On sauvegarde la clé générée par Firebase
+    const newRef = push(ref(db, 'scores'));
+    currentScoreId = newRef.key;
+    
+    set(newRef, { 
         "Candidat": name, 
         "playerNum": pNum || "",
         "Score Points": totalScore, 
@@ -816,16 +843,10 @@ async function savePseudoChoice() {
     if (input !== "") {
         let cleanName = sanitizeString(input);
         try {
-            const snapshot = await get(ref(db, 'scores'));
-            if (snapshot.exists()) {
-                const scoresObj = snapshot.val();
-                for (let key in scoresObj) {
-                    if (scoresObj[key].Candidat === playerName && scoresObj[key].PIN === playerPin) {
-                        await set(ref(db, `scores/${key}/Candidat`), cleanName);
-                        playerName = cleanName; 
-                        break;
-                    }
-                }
+            // Modification sécurisée par ciblage direct de la clé
+            if (currentScoreId) {
+                await set(ref(db, `scores/${currentScoreId}/Candidat`), cleanName);
+                playerName = cleanName; 
             }
         } catch(e) { console.error(e); }
     }
@@ -1078,7 +1099,7 @@ async function resetPodium() {
 }
 
 // ==========================================
-// EXPORTS (EXCEL & PDF)
+// EXPORTS EXCEL / PDF
 // ==========================================
 async function downloadExcel() {
     closeModal('admin-hub-modal');
@@ -1469,6 +1490,7 @@ function editQuestion(index) {
 async function saveQuestion(index) {
     let ansRadios = document.getElementsByName('edit-ans'); 
     let ans = 0; 
+    
     for(let i=0; i<ansRadios.length; i++) { 
         if(ansRadios[i].checked) ans = parseInt(ansRadios[i].value); 
     }
@@ -1497,9 +1519,17 @@ async function saveQuestion(index) {
     }
 }
 
-function exportQuestionsPDF() {
+function openExportQuestionsModal() {
     closeModal('admin-hub-modal');
-    
+    document.getElementById('export-cat').value = 'ALL';
+    document.getElementById('export-diff').value = 'ALL';
+    document.getElementById('export-questions-modal').classList.add('show');
+}
+
+function generateQuestionsPDF() {
+    let filterCat = document.getElementById('export-cat').value;
+    let filterDiff = document.getElementById('export-diff').value;
+
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF('landscape');
     
@@ -1509,7 +1539,13 @@ function exportQuestionsPDF() {
     
     let tableData = [];
     
-    let sortedDB = [...dynamicDB].sort((a, b) => {
+    let filteredDB = dynamicDB.filter(q => {
+        if (filterCat !== 'ALL' && q.cat !== filterCat) return false;
+        if (filterDiff !== 'ALL' && q.diff !== filterDiff) return false;
+        return true;
+    });
+
+    let sortedDB = filteredDB.sort((a, b) => {
         if (a.cat === b.cat) return a.diff.localeCompare(b.diff);
         return a.cat.localeCompare(b.cat);
     });
@@ -1540,6 +1576,7 @@ function exportQuestionsPDF() {
     });
 
     doc.save(`Questions_GEII.pdf`);
+    closeModal('export-questions-modal');
 }
 
 // ==========================================
@@ -1592,7 +1629,6 @@ function hideScreensaver() {
 
 resetIdleTimer();
 
-
 document.addEventListener('keydown', function(e) {
     const activeScreen = document.querySelector('.active-screen'); 
     const screensaver = document.getElementById('screensaver');
@@ -1607,13 +1643,15 @@ document.addEventListener('keydown', function(e) {
     const isDetailsOpen = document.getElementById('details-modal').classList.contains('show');
     const isEditorOpen = document.getElementById('editor-modal').classList.contains('show');
     const isAdminHubOpen = document.getElementById('admin-hub-modal').classList.contains('show');
+    const isExportQOpen = document.getElementById('export-questions-modal').classList.contains('show');
     
-    const anyModalOpen = isPasswordOpen || isPseudoChoiceOpen || isDetailsOpen || isEditorOpen || isAdminHubOpen;
+    const anyModalOpen = isPasswordOpen || isPseudoChoiceOpen || isDetailsOpen || isEditorOpen || isAdminHubOpen || isExportQOpen;
 
     if (e.key === 'Escape') { 
         if (isDetailsOpen) closeModal('details-modal'); 
         else if (isEditorOpen) closeEditor(); 
         else if (isAdminHubOpen) closeModal('admin-hub-modal');
+        else if (isExportQOpen) closeModal('export-questions-modal');
         else if (isPasswordOpen) closeModal('password-modal');
         else if (isPseudoChoiceOpen) skipPseudoChoice();
         else if (activeScreen && (activeScreen.id === 'screen-game' || activeScreen.id === 'screen-intermediate')) { 
@@ -1638,7 +1676,6 @@ document.addEventListener('keydown', function(e) {
         if (anyModalOpen) {
             return; 
         }
-
 
         if (activeScreen) { 
             if (activeScreen.id === 'screen-start') {
