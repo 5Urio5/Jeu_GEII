@@ -90,7 +90,7 @@ window.showScreensaver = showScreensaver;
 window.hideScreensaver = hideScreensaver;
 window.goToNextQuestion = goToNextQuestion; 
 window.togglePasswordVisibility = togglePasswordVisibility;
-window.togglePlayerPasswordVisibility = togglePlayerPasswordVisibility;
+window.togglePlayerPasswordVisibility = togglePlayerPasswordVisibility; 
 window.generatePlayerPDF = generatePlayerPDF; 
 window.generateAdminPDF = generateAdminPDF;
 window.openQuestionEditor = openQuestionEditor; 
@@ -123,24 +123,15 @@ async function loadQuestionsFromFirebase() {
     try {
         const snap = await get(ref(db, 'questions'));
         if (snap.exists()) {
-            let rawData = snap.val();
-            let tempDB = [];
-            
-            if (Array.isArray(rawData)) {
-                tempDB = rawData;
-            } else if (typeof rawData === 'object') {
-                tempDB = Object.values(rawData);
-            }
-            
-            dynamicDB = tempDB.filter(q => q !== null && q !== undefined && typeof q === 'object' && q.q && q.cat);
+            dynamicDB = snap.val();
         } else {
-            let localDB = (typeof window.DB !== 'undefined') ? window.DB : (typeof DB !== 'undefined' ? DB : []);
+            let localDB = (typeof DB !== 'undefined') ? DB : [];
             await set(ref(db, 'questions'), localDB);
             dynamicDB = localDB;
         }
     } catch (error) {
         console.error("Erreur de chargement des questions, utilisation locale.", error);
-        dynamicDB = (typeof window.DB !== 'undefined') ? window.DB : (typeof DB !== 'undefined' ? DB : []); 
+        dynamicDB = (typeof DB !== 'undefined') ? DB : []; 
     }
 }
 loadQuestionsFromFirebase();
@@ -186,6 +177,7 @@ function togglePasswordVisibility() {
     }
 }
 
+// Masquer/Afficher le mot de passe du Joueur
 function togglePlayerPasswordVisibility() {
     const input = document.getElementById('new-player-pin');
     const toggleBtn = document.getElementById('toggle-player-pwd-btn');
@@ -380,10 +372,8 @@ async function startQuiz() {
     currentScoreId = null;
 
     let selected = [];
-    let safeDB = dynamicDB.filter(q => q !== null && q !== undefined && q.cat);
-
     ['AII', 'EME', 'ESE'].forEach(cat => {
-        let catQ = safeDB.filter(q => q.cat === cat);
+        let catQ = dynamicDB.filter(q => q && q.cat === cat);
         let qCom = getRandom(catQ.filter(q => q.diff === "Com"), 2);
         let qSTI = getRandom(catQ.filter(q => q.diff === "STI"), 3);
         let qBU1 = getRandom(catQ.filter(q => q.diff === "BU1"), 3);
@@ -392,30 +382,15 @@ async function startQuiz() {
     });
 
     selected = selected.filter(q => q !== undefined && q !== null);
-    
-    if (selected.length < 30) {
-        let missingCount = 30 - selected.length;
-        let remainingQuestions = safeDB.filter(q => !selected.includes(q));
-        let fillQuestions = getRandom(remainingQuestions, missingCount);
-        selected = selected.concat(fillQuestions);
-    }
-
     currentQuestions = selected.sort(() => 0.5 - Math.random());
-    totalQuestions = currentQuestions.length;
-
-    if (totalQuestions === 0) {
-        alert("❌ Erreur : Aucune question trouvée dans la base de données !");
-        return;
-    }
 
     if (isDemoMode) {
         isDemoMode = false; 
         playerName = "PlayerManon (Démo)";
         
-        let questionsToSimulate = totalQuestions - 1;
-        
-        for(let i = 0; i < questionsToSimulate; i++) {
+        for(let i = 0; i < 29; i++) {
             let q = currentQuestions[i];
+            if(!q) continue;
             let isCorrect = Math.random() > 0.3; 
             let timeTaken = Math.floor(Math.random() * 15) + 2; 
             let timeLeftSim = timeLimit - timeTaken;
@@ -441,16 +416,16 @@ async function startQuiz() {
             });
         }
         
-        currentQIndex = questionsToSimulate; 
+        currentQIndex = 29; 
         
         let progContainer = document.getElementById('progress-container'); 
         progContainer.innerHTML = '';
-        for(let i=0; i<totalQuestions; i++) { 
+        for(let i=0; i<30; i++) { 
             let box = document.createElement('div');
             box.className = 'progress-box';
             box.id = `box-${i}`;
-            if (i < questionsToSimulate) {
-                if (playerSessionDetails[i].isCorrect) box.classList.add('prog-correct');
+            if (i < 29) {
+                if (playerSessionDetails[i] && playerSessionDetails[i].isCorrect) box.classList.add('prog-correct');
                 else box.classList.add('prog-wrong');
             }
             progContainer.appendChild(box);
@@ -484,7 +459,7 @@ async function startQuiz() {
     
     let progContainer = document.getElementById('progress-container'); 
     progContainer.innerHTML = '';
-    for(let i=0; i<totalQuestions; i++) { 
+    for(let i=0; i<30; i++) { 
         progContainer.innerHTML += `<div class="progress-box" id="box-${i}"></div>`; 
     }
     
@@ -665,15 +640,7 @@ function goToNextQuestion() {
         playSound('drumroll'); 
         setTimeout(async () => { 
             document.getElementById('cp-player-name').innerText = playerName;
-            
-            let pinInput = document.getElementById('new-player-pin');
-            if(pinInput) {
-                pinInput.value = '';
-                pinInput.type = 'password';
-                let togglePlayerBtn = document.getElementById('toggle-player-pwd-btn');
-                if (togglePlayerBtn) togglePlayerBtn.innerText = '👁️';
-            }
-            
+            document.getElementById('new-player-pin').value = '';
             slideTo('screen-create-password');
         }, 3000); 
     }
@@ -1059,12 +1026,9 @@ async function changePlayerPassword(playerId) {
 
 function closeModal(modalId) { 
     if(modalId) {
-        let m = document.getElementById(modalId);
-        if(m) m.classList.remove('show'); 
+        document.getElementById(modalId).classList.remove('show'); 
     } else {
-        document.querySelectorAll('.modal-content').forEach(m => {
-            m.parentElement.classList.remove('show');
-        });
+        document.querySelectorAll('.modal-content').forEach(m => m.parentElement.classList.remove('show'));
     }
 }
 
@@ -1383,6 +1347,7 @@ async function generateAdminPDF() {
     }
 }
 
+// Fonction d'Export PDF DIRECT (Sans filtres pour éviter les bugs)
 function exportQuestionsPDF() {
     closeModal('admin-hub-modal');
     
@@ -1658,7 +1623,6 @@ document.addEventListener('keydown', function(e) {
     }
     
     if (e.key === 'Enter') { 
-        // Gestion des modales en priorité
         if (isPasswordOpen) {
             document.getElementById('submit-pwd-btn').click();
             return;
@@ -1680,15 +1644,11 @@ document.addEventListener('keydown', function(e) {
                 startQuiz();
             } else if (activeScreen.id === 'screen-intermediate') { 
                 goToNextQuestion(); 
-            } else if (activeScreen.id === 'screen-create-password') {
-                submitNewPassword();
-            } else if (activeScreen.id === 'screen-survey') {
-                submitSurveyAndGoToPodium();
-            }
+            } 
         } 
     }
     
-    // FLÈCHES DU CLAVIER (Navigation dans les réponses)
+    // FLÈCHES DU CLAVIER (Navigation dans les réponses avec SURBRILLANCE)
     if (activeScreen && activeScreen.id === 'screen-game' && !anyModalOpen) {
         if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
             e.preventDefault(); 
