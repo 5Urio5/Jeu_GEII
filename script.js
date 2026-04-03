@@ -5,7 +5,6 @@
 // ==========================================
 const ADMIN_PASSWORD = "iutgeii"; 
 
-// Coefficients de difficulté appliqués aux points
 const DIFF_WEIGHTS = { 
     "Com": 0.75, 
     "STI": 1, 
@@ -13,7 +12,6 @@ const DIFF_WEIGHTS = {
     "BU2": 1.5 
 };
 
-// Traduction visuelle des catégories pour les joueurs (Pastilles & Excel)
 const DIFF_LABELS = { 
     "Com": "CG", 
     "STI": "STI2D", 
@@ -50,13 +48,13 @@ let playerName = "";
 let playerPin = ""; 
 let currentQuestions = []; 
 let currentQIndex = 0;
+
 let scoresPoints = {AII: 0, EME: 0, ESE: 0}; 
 let scoresCount = {AII: 0, EME: 0, ESE: 0};
 let scoreTotal = 0; 
 let currentStreak = 0; 
 let playerSessionDetails = []; 
 
-// Variables adaptables selon le chargement
 let totalQuestions = 30; 
 let timeLimit = 30; 
 let timeLeft = timeLimit;
@@ -69,9 +67,10 @@ let dynamicDB = [];
 let resultsChartInstance = null;
 let modalChartInstance = null;
 let currentViewingPlayerId = null; 
+
 let isDemoMode = false; 
 let currentAssignedNum = null; 
-let currentScoreId = null; // Clé unique pour empêcher les doublons de pseudo
+let currentScoreId = null; 
 
 const AudioContextClass = window.AudioContext || window.webkitAudioContext;
 let audioCtx;
@@ -93,7 +92,7 @@ window.showScreensaver = showScreensaver;
 window.hideScreensaver = hideScreensaver;
 window.goToNextQuestion = goToNextQuestion; 
 window.togglePasswordVisibility = togglePasswordVisibility;
-window.togglePlayerPasswordVisibility = togglePlayerPasswordVisibility;
+window.togglePlayerPasswordVisibility = togglePlayerPasswordVisibility; 
 window.generatePlayerPDF = generatePlayerPDF; 
 window.generateAdminPDF = generateAdminPDF;
 window.openQuestionEditor = openQuestionEditor; 
@@ -122,68 +121,34 @@ window.generateQuestionsPDF = generateQuestionsPDF;
 
 
 // ==========================================
-// LIAISONS SÉCURISÉES DE LA TOUCHE ENTRÉE
-// ==========================================
-// On isole les événements "Entrée" spécifiquement sur les champs de texte 
-// pour empêcher les conflits avec l'écouteur global du jeu.
-const pinInputNode = document.getElementById('new-player-pin');
-if(pinInputNode) {
-    pinInputNode.addEventListener('keydown', function(e) {
-        if(e.key === 'Enter') {
-            e.preventDefault();
-            e.stopPropagation(); // Bloque la propagation du clic
-            submitNewPassword();
-        }
-    });
-}
-
-const pseudoInputNode = document.getElementById('optional-pseudo-input');
-if(pseudoInputNode) {
-    pseudoInputNode.addEventListener('keydown', function(e) {
-        if(e.key === 'Enter') {
-            e.preventDefault();
-            e.stopPropagation();
-            savePseudoChoice();
-        }
-    });
-}
-
-const surveyScreenNode = document.getElementById('screen-survey');
-if(surveyScreenNode) {
-    surveyScreenNode.addEventListener('keydown', function(e) {
-        if(e.key === 'Enter') {
-            // Autorise le saut de ligne si l'étudiant est dans la zone de remarque
-            if (document.activeElement && document.activeElement.tagName === 'TEXTAREA') {
-                return;
-            }
-            e.preventDefault();
-            e.stopPropagation();
-            submitSurveyAndGoToPodium();
-        }
-    });
-}
-
-
-// ==========================================
-// DÉFINITION DES FONCTIONS INITIALES
+// INITIALISATION DE LA BASE DE DONNÉES
 // ==========================================
 async function loadQuestionsFromFirebase() {
     try {
         const snap = await get(ref(db, 'questions'));
         if (snap.exists()) {
-            dynamicDB = snap.val();
+            let rawData = snap.val();
+            if (Array.isArray(rawData)) {
+                dynamicDB = rawData.filter(q => q !== null && q !== undefined && q.cat);
+            } else {
+                dynamicDB = Object.values(rawData).filter(q => q !== null && q !== undefined && q.cat);
+            }
         } else {
-            let localDB = (typeof window.DB !== 'undefined') ? window.DB : (typeof DB !== 'undefined' ? DB : []);
+            let localDB = (typeof DB !== 'undefined') ? DB : [];
             await set(ref(db, 'questions'), localDB);
             dynamicDB = localDB;
         }
     } catch (error) {
         console.error("Erreur de chargement des questions, utilisation locale.", error);
-        dynamicDB = (typeof window.DB !== 'undefined') ? window.DB : (typeof DB !== 'undefined' ? DB : []); 
+        dynamicDB = (typeof DB !== 'undefined') ? DB : []; 
     }
 }
 loadQuestionsFromFirebase();
 
+
+// ==========================================
+// UTILITAIRES ET SÉCURITÉ
+// ==========================================
 function askPassword(customTitle = "⚠️ ZONE SÉCURISÉE ⚠️", customDesc = "Veuillez entrer le mot de passe :") {
     return new Promise((resolve) => {
         const modal = document.getElementById('password-modal');
@@ -211,7 +176,6 @@ function askPassword(customTitle = "⚠️ ZONE SÉCURISÉE ⚠️", customDesc 
         submitBtn.onclick = () => { cleanup(); resolve(input.value); };
         cancelBtn.onclick = () => { cleanup(); resolve(null); };
         
-        // Bloque le bug de l'entrée globale !
         input.onkeydown = (e) => { 
             if (e.key === 'Enter') { 
                 e.preventDefault();
@@ -362,7 +326,6 @@ function goToStart() {
     setRandomBackground(); 
     resetIdleTimer(); 
     
-    // Purge de l'écran du mot de passe
     let pinInput = document.getElementById('new-player-pin');
     if(pinInput) {
         pinInput.value = '';
@@ -371,7 +334,6 @@ function goToStart() {
         if (togglePlayerBtn) togglePlayerBtn.innerText = '👁️';
     }
     
-    // Purge complète du questionnaire de satisfaction
     for(let i = 1; i <= 5; i++) {
         let qElement = document.getElementById('survey-q' + i);
         if(qElement) qElement.value = "";
@@ -384,7 +346,6 @@ async function cancelQuiz() {
     if (confirm("⚠️ Es-tu sûr de vouloir annuler la partie en cours ?\n\nTa progression ne sera pas sauvegardée et n'apparaîtra pas dans le classement. Tu perdras tout.")) {
         clearInterval(timerInterval); 
         
-        // Libération du numéro joueur généré si on annule en cours
         if (currentAssignedNum !== null) {
             try { 
                 await set(ref(db, `metadata/usedIds/${currentAssignedNum}`), null); 
@@ -420,7 +381,6 @@ async function startQuiz() {
     if (!audioCtx) audioCtx = new AudioContextClass(); 
     if (audioCtx.state === 'suspended') audioCtx.resume();
 
-    // Sécurité de purge supplémentaire au lancement du jeu
     let pinInput = document.getElementById('new-player-pin');
     if(pinInput) {
         pinInput.value = '';
@@ -441,49 +401,46 @@ async function startQuiz() {
     playerSessionDetails = [];
     currentAssignedNum = null;
     currentScoreId = null;
-    
-    // Au cas où la base de données ne soit pas encore chargée
+
     if (!dynamicDB || dynamicDB.length === 0) {
         alert("⚠️ Les questions sont en cours de chargement. Veuillez patienter une seconde...");
         return;
     }
 
-    // Mixage robuste des questions (BOUCLIER ANTI-CRASH)
+    let safeDB = dynamicDB.filter(q => q !== null && q !== undefined && q.cat);
+    
     let selected = [];
     ['AII', 'EME', 'ESE'].forEach(cat => {
-        let catQ = dynamicDB.filter(q => q.cat === cat);
+        let catQ = safeDB.filter(q => q.cat === cat);
         let qCom = getRandom(catQ.filter(q => q.diff === "Com"), 2);
         let qSTI = getRandom(catQ.filter(q => q.diff === "STI"), 3);
         let qBU1 = getRandom(catQ.filter(q => q.diff === "BU1"), 3);
         let qBU2 = getRandom(catQ.filter(q => q.diff === "BU2"), 2);
         selected = selected.concat(qCom, qSTI, qBU1, qBU2);
     });
+
+    selected = selected.filter(q => q !== null && q !== undefined);
     
-    // On retire les éléments indéfinis qui auraient pu s'insérer si la base est incomplète
-    selected = selected.filter(q => q !== undefined);
-    
-    // Si après filtrage il nous manque des questions pour atteindre les 30, on comble les trous
     if (selected.length < 30) {
         let missingCount = 30 - selected.length;
-        let remainingQuestions = dynamicDB.filter(q => !selected.includes(q));
+        let remainingQuestions = safeDB.filter(q => !selected.includes(q));
         let fillQuestions = getRandom(remainingQuestions, missingCount);
         selected = selected.concat(fillQuestions);
     }
 
     currentQuestions = selected.sort(() => 0.5 - Math.random());
-    totalQuestions = currentQuestions.length; // S'adapte dynamiquement si vraiment la base est vide
+    totalQuestions = currentQuestions.length;
 
-    if(totalQuestions === 0){
-        alert("❌ Base de données vide ! Allez dans le panneau administrateur pour restaurer les questions.");
+    if (totalQuestions === 0) {
+        alert("❌ Erreur : Aucune question trouvée dans la base de données !");
         return;
     }
 
-    // SIMULATION MODE DÉMO (Option Administrateur)
     if (isDemoMode) {
         isDemoMode = false; 
         playerName = "PlayerManon (Démo)";
         
-        let questionsToSimulate = totalQuestions - 1; // On simule tout sauf la dernière
+        let questionsToSimulate = totalQuestions - 1;
         
         for(let i = 0; i < questionsToSimulate; i++) {
             let q = currentQuestions[i];
@@ -533,7 +490,6 @@ async function startQuiz() {
         return; 
     }
 
-    // MODE NORMAL (Utilisation de la transaction pour le pseudo séquentiel PlayerXXXX)
     const idsRef = ref(db, 'metadata/usedIds');
     try {
         await runTransaction(idsRef, (currentData) => {
@@ -885,7 +841,6 @@ async function showResultsFinal() {
 }
 
 function saveScoreFirebase(name, totalScore, profil, pin, pNum) {
-    // 🔥 RÉSOLUTION DU DOUBLON : On sauvegarde la clé générée par Firebase
     const newRef = push(ref(db, 'scores'));
     currentScoreId = newRef.key;
     
@@ -901,6 +856,7 @@ function saveScoreFirebase(name, totalScore, profil, pin, pNum) {
         "PIN": pin || "" 
     });
 }
+
 
 // ==========================================
 // CHOIX DU PSEUDO & QUESTIONNAIRE
@@ -931,7 +887,6 @@ async function savePseudoChoice() {
     if (input !== "") {
         let cleanName = sanitizeString(input);
         try {
-            // Modification sécurisée par ciblage direct de la clé
             if (currentScoreId) {
                 await set(ref(db, `scores/${currentScoreId}/Candidat`), cleanName);
                 playerName = cleanName; 
@@ -968,8 +923,9 @@ async function submitSurveyAndGoToPodium() {
     showPodium();
 }
 
+
 // ==========================================
-// PODIUM ET MODALE DÉTAILS
+// PODIUM ET MODALES
 // ==========================================
 async function showPodium() {
     resetIdleTimer(); 
@@ -1185,6 +1141,7 @@ async function resetPodium() {
         } catch (error) { alert("Erreur lors de la réinitialisation."); }
     }
 }
+
 
 // ==========================================
 // EXPORTS EXCEL / PDF
@@ -1455,10 +1412,10 @@ async function generateAdminPDF() {
     }
 }
 
+
 // ==========================================
 // EDITEUR DE QUESTIONS (ADMIN)
 // ==========================================
-
 function openQuestionEditor() {
     closeModal('admin-hub-modal');
     document.getElementById('filter-cat').value = 'ALL';
@@ -1668,7 +1625,7 @@ function generateQuestionsPDF() {
 }
 
 // ==========================================
-// ECRAN DE VEILLE ET ÉCOUTEUR CLAVIER
+// ECRAN DE VEILLE ET ÉCOUTEUR CLAVIER GLOBAL
 // ==========================================
 function resetIdleTimer() { 
     clearTimeout(idleTimer); 
@@ -1717,7 +1674,7 @@ function hideScreensaver() {
 
 resetIdleTimer();
 
-// L'écouteur global du clavier
+// L'Écouteur clavier (Entrée / Echap / Flèches) avec sécurité anti-superposition
 document.addEventListener('keydown', function(e) {
     const activeScreen = document.querySelector('.active-screen'); 
     const screensaver = document.getElementById('screensaver');
@@ -1749,10 +1706,24 @@ document.addEventListener('keydown', function(e) {
     }
     
     if (e.key === 'Enter') { 
+        // Gestion des modales bloquantes
+        if (isPasswordOpen) {
+            document.getElementById('submit-pwd-btn').click();
+            return;
+        }
+        if (isPseudoChoiceOpen) {
+            if(document.getElementById('optional-pseudo-input').style.display === 'block'){
+                document.getElementById('pseudo-buttons-step2').querySelector('button').click();
+            } else {
+                document.getElementById('pseudo-buttons-step1').querySelectorAll('button')[1].click();
+            }
+            return;
+        }
         if (anyModalOpen) {
-            return; // Bloque toute autre action d'arrière-plan si une modale est ouverte
+            return; 
         }
 
+        // Navigation dans les écrans
         if (activeScreen) { 
             if (activeScreen.id === 'screen-start') {
                 startQuiz();
