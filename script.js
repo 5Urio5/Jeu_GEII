@@ -55,10 +55,13 @@ let scoresCount = {AII: 0, EME: 0, ESE: 0};
 let scoreTotal = 0; 
 let currentStreak = 0; 
 let playerSessionDetails = []; 
+
+// Variables adaptables selon le chargement
 let totalQuestions = 30; 
 let timeLimit = 30; 
 let timeLeft = timeLimit;
 let timerInterval; 
+
 let idleTimer; 
 const IDLE_TIME = 120000; 
 
@@ -66,10 +69,9 @@ let dynamicDB = [];
 let resultsChartInstance = null;
 let modalChartInstance = null;
 let currentViewingPlayerId = null; 
-
 let isDemoMode = false; 
 let currentAssignedNum = null; 
-let currentScoreId = null; // CLÉ UNIQUE POUR EMPÊCHER LES DOUBLONS
+let currentScoreId = null; // Clé unique pour empêcher les doublons de pseudo
 
 const AudioContextClass = window.AudioContext || window.webkitAudioContext;
 let audioCtx;
@@ -120,6 +122,49 @@ window.generateQuestionsPDF = generateQuestionsPDF;
 
 
 // ==========================================
+// LIAISONS SÉCURISÉES DE LA TOUCHE ENTRÉE
+// ==========================================
+// On isole les événements "Entrée" spécifiquement sur les champs de texte 
+// pour empêcher les conflits avec l'écouteur global du jeu.
+const pinInputNode = document.getElementById('new-player-pin');
+if(pinInputNode) {
+    pinInputNode.addEventListener('keydown', function(e) {
+        if(e.key === 'Enter') {
+            e.preventDefault();
+            e.stopPropagation(); // Bloque la propagation du clic
+            submitNewPassword();
+        }
+    });
+}
+
+const pseudoInputNode = document.getElementById('optional-pseudo-input');
+if(pseudoInputNode) {
+    pseudoInputNode.addEventListener('keydown', function(e) {
+        if(e.key === 'Enter') {
+            e.preventDefault();
+            e.stopPropagation();
+            savePseudoChoice();
+        }
+    });
+}
+
+const surveyScreenNode = document.getElementById('screen-survey');
+if(surveyScreenNode) {
+    surveyScreenNode.addEventListener('keydown', function(e) {
+        if(e.key === 'Enter') {
+            // Autorise le saut de ligne si l'étudiant est dans la zone de remarque
+            if (document.activeElement && document.activeElement.tagName === 'TEXTAREA') {
+                return;
+            }
+            e.preventDefault();
+            e.stopPropagation();
+            submitSurveyAndGoToPodium();
+        }
+    });
+}
+
+
+// ==========================================
 // DÉFINITION DES FONCTIONS INITIALES
 // ==========================================
 async function loadQuestionsFromFirebase() {
@@ -128,13 +173,13 @@ async function loadQuestionsFromFirebase() {
         if (snap.exists()) {
             dynamicDB = snap.val();
         } else {
-            let localDB = (typeof DB !== 'undefined') ? DB : [];
+            let localDB = (typeof window.DB !== 'undefined') ? window.DB : (typeof DB !== 'undefined' ? DB : []);
             await set(ref(db, 'questions'), localDB);
             dynamicDB = localDB;
         }
     } catch (error) {
         console.error("Erreur de chargement des questions, utilisation locale.", error);
-        dynamicDB = (typeof DB !== 'undefined') ? DB : []; 
+        dynamicDB = (typeof window.DB !== 'undefined') ? window.DB : (typeof DB !== 'undefined' ? DB : []); 
     }
 }
 loadQuestionsFromFirebase();
@@ -165,6 +210,22 @@ function askPassword(customTitle = "⚠️ ZONE SÉCURISÉE ⚠️", customDesc 
         
         submitBtn.onclick = () => { cleanup(); resolve(input.value); };
         cancelBtn.onclick = () => { cleanup(); resolve(null); };
+        
+        // Bloque le bug de l'entrée globale !
+        input.onkeydown = (e) => { 
+            if (e.key === 'Enter') { 
+                e.preventDefault();
+                e.stopPropagation();
+                cleanup(); 
+                resolve(input.value); 
+            } 
+            if (e.key === 'Escape') { 
+                e.preventDefault();
+                e.stopPropagation();
+                cleanup(); 
+                resolve(null); 
+            }
+        };
     });
 }
 
@@ -380,7 +441,14 @@ async function startQuiz() {
     playerSessionDetails = [];
     currentAssignedNum = null;
     currentScoreId = null;
+    
+    // Au cas où la base de données ne soit pas encore chargée
+    if (!dynamicDB || dynamicDB.length === 0) {
+        alert("⚠️ Les questions sont en cours de chargement. Veuillez patienter une seconde...");
+        return;
+    }
 
+    // Mixage robuste des questions (BOUCLIER ANTI-CRASH)
     let selected = [];
     ['AII', 'EME', 'ESE'].forEach(cat => {
         let catQ = dynamicDB.filter(q => q.cat === cat);
@@ -390,14 +458,34 @@ async function startQuiz() {
         let qBU2 = getRandom(catQ.filter(q => q.diff === "BU2"), 2);
         selected = selected.concat(qCom, qSTI, qBU1, qBU2);
     });
+    
+    // On retire les éléments indéfinis qui auraient pu s'insérer si la base est incomplète
+    selected = selected.filter(q => q !== undefined);
+    
+    // Si après filtrage il nous manque des questions pour atteindre les 30, on comble les trous
+    if (selected.length < 30) {
+        let missingCount = 30 - selected.length;
+        let remainingQuestions = dynamicDB.filter(q => !selected.includes(q));
+        let fillQuestions = getRandom(remainingQuestions, missingCount);
+        selected = selected.concat(fillQuestions);
+    }
+
     currentQuestions = selected.sort(() => 0.5 - Math.random());
+    totalQuestions = currentQuestions.length; // S'adapte dynamiquement si vraiment la base est vide
+
+    if(totalQuestions === 0){
+        alert("❌ Base de données vide ! Allez dans le panneau administrateur pour restaurer les questions.");
+        return;
+    }
 
     // SIMULATION MODE DÉMO (Option Administrateur)
     if (isDemoMode) {
         isDemoMode = false; 
         playerName = "PlayerManon (Démo)";
         
-        for(let i = 0; i < 29; i++) {
+        let questionsToSimulate = totalQuestions - 1; // On simule tout sauf la dernière
+        
+        for(let i = 0; i < questionsToSimulate; i++) {
             let q = currentQuestions[i];
             let isCorrect = Math.random() > 0.3; 
             let timeTaken = Math.floor(Math.random() * 15) + 2; 
@@ -424,15 +512,15 @@ async function startQuiz() {
             });
         }
         
-        currentQIndex = 29; 
+        currentQIndex = questionsToSimulate; 
         
         let progContainer = document.getElementById('progress-container'); 
         progContainer.innerHTML = '';
-        for(let i=0; i<30; i++) { 
+        for(let i=0; i<totalQuestions; i++) { 
             let box = document.createElement('div');
             box.className = 'progress-box';
             box.id = `box-${i}`;
-            if (i < 29) {
+            if (i < questionsToSimulate) {
                 if (playerSessionDetails[i].isCorrect) box.classList.add('prog-correct');
                 else box.classList.add('prog-wrong');
             }
@@ -445,7 +533,7 @@ async function startQuiz() {
         return; 
     }
 
-    // MODE NORMAL (Utilisation de la transaction pour PlayerXXXX)
+    // MODE NORMAL (Utilisation de la transaction pour le pseudo séquentiel PlayerXXXX)
     const idsRef = ref(db, 'metadata/usedIds');
     try {
         await runTransaction(idsRef, (currentData) => {
@@ -468,7 +556,7 @@ async function startQuiz() {
     
     let progContainer = document.getElementById('progress-container'); 
     progContainer.innerHTML = '';
-    for(let i=0; i<30; i++) { 
+    for(let i=0; i<totalQuestions; i++) { 
         progContainer.innerHTML += `<div class="progress-box" id="box-${i}"></div>`; 
     }
     
@@ -1629,6 +1717,7 @@ function hideScreensaver() {
 
 resetIdleTimer();
 
+// L'écouteur global du clavier
 document.addEventListener('keydown', function(e) {
     const activeScreen = document.querySelector('.active-screen'); 
     const screensaver = document.getElementById('screensaver');
@@ -1660,21 +1749,8 @@ document.addEventListener('keydown', function(e) {
     }
     
     if (e.key === 'Enter') { 
-        // Gestion des modales en priorité
-        if (isPasswordOpen) {
-            document.getElementById('submit-pwd-btn').click();
-            return;
-        }
-        if (isPseudoChoiceOpen) {
-            if(document.getElementById('optional-pseudo-input').style.display === 'block'){
-                document.getElementById('pseudo-buttons-step2').querySelector('button').click();
-            } else {
-                document.getElementById('pseudo-buttons-step1').querySelectorAll('button')[1].click();
-            }
-            return;
-        }
         if (anyModalOpen) {
-            return; 
+            return; // Bloque toute autre action d'arrière-plan si une modale est ouverte
         }
 
         if (activeScreen) { 
@@ -1682,11 +1758,7 @@ document.addEventListener('keydown', function(e) {
                 startQuiz();
             } else if (activeScreen.id === 'screen-intermediate') { 
                 goToNextQuestion(); 
-            } else if (activeScreen.id === 'screen-create-password') {
-                submitNewPassword();
-            } else if (activeScreen.id === 'screen-survey') {
-                submitSurveyAndGoToPodium();
-            }
+            } 
         } 
     }
     
