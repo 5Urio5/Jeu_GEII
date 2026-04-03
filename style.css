@@ -48,7 +48,7 @@ input[type="text"]:focus, input[type="password"]:focus, .editor-input:focus { bo
 .editor-input, .editor-select { font-size: 1em; padding: 8px; width: 100%; text-align: left; margin: 5px 0 15px 0; }
 .editor-select { width: auto; margin-right: 15px; }
 
-/* NOUVEAU : STYLE FORMULAIRE SATISFACTION */
+/* STYLE FORMULAIRE SATISFACTION */
 .survey-form { text-align: left; margin-bottom: 20px; }
 .survey-form label { display: block; font-size: 1.1em; font-weight: bold; margin-bottom: 8px; color: #ecf0f1; }
 .survey-form select { background-color: rgba(255,255,255,0.9); cursor: pointer; }

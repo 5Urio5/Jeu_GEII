@@ -13,7 +13,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
 
-    <link rel="stylesheet" href="style.css?v=21">
+    <link rel="stylesheet" href="style.css?v=22">
 </head>
 <body>
 
@@ -73,8 +73,12 @@
         <h1 style="color: #f1c40f;">Bravo <span id="cp-player-name"></span> ! 🎉</h1>
         <h2 style="margin-bottom: 10px;">Avant de découvrir tes résultats :</h2>
         <p style="font-size: 1.2em; margin-bottom: 30px;">Crée un mot de passe personnel. Il te sera demandé pour consulter l'analyse détaillée de tes réponses depuis le podium général.</p>
-        <input type="text" id="new-player-pin" placeholder="Ton mot de passe secret" autocomplete="off" maxlength="20">
-        <br>
+        
+        <div class="pwd-container" style="max-width: 400px; margin: 0 auto 20px;">
+            <input type="password" id="new-player-pin" placeholder="Ton mot de passe secret" autocomplete="off" maxlength="20" style="margin-bottom: 0;">
+            <span id="toggle-player-pwd-btn" class="pwd-toggle" onclick="togglePlayerPasswordVisibility()" title="Afficher/Masquer">👁️</span>
+        </div>
+        
         <button class="main-btn" onclick="submitNewPassword()">Valider et voir mes résultats</button>
     </div>
 
@@ -82,9 +86,9 @@
         <h1>🎉 RÉSULTAT FINAL ! 🎉</h1>
         <h3 id="final-score" style="color:#f1c40f; font-size: 2em; margin-bottom: 5px;">Score : 0 pts</h3>
         
-        <p style="color: white; font-weight: bold; background: #e74c3c; padding: 10px 20px; border-radius: 10px; display: inline-block; box-shadow: 0 4px 6px rgba(0,0,0,0.3); margin-bottom: 20px;">
-            ⚠️ Ton identifiant est le : <span id="results-player-name" style="font-size: 1.3em; text-decoration: underline;">PlayerXXXX</span><br>
-            Note-le ou télécharge le PDF, il est indispensable pour te retrouver sur le podium !
+        <p style="color: white; font-weight: bold; background: #e74c3c; padding: 10px 20px; border-radius: 10px; display: inline-block; box-shadow: 0 4px 6px rgba(0,0,0,0.3); margin-bottom: 20px; line-height: 1.4;">
+            ⚠️ Ton identifiant par défaut est : <span id="results-player-name" style="font-size: 1.3em; text-decoration: underline;">PlayerXXXX</span><br>
+            <span style="font-size: 0.9em;">Tu pourras le modifier à l'étape suivante ! Note-le bien ou télécharge le PDF.</span>
         </p>
         
         <div class="results-layout">
@@ -103,7 +107,7 @@
         </div>
     </div>
 
-    <div id="screen-survey" class="container hidden slide-in-right">
+    <div id="screen-survey" class="container hidden slide-in-right" style="background: linear-gradient(135deg, #3498db 0%, #2980b9 100%); border-color: #2980b9;">
         <h1 style="color: #f1c40f;">Ton avis nous intéresse !</h1>
         <p style="font-size: 1.1em; margin-bottom: 20px;">Afin de valider notre projet de communication GEII, pourrais-tu répondre rapidement à ces quelques questions ?</p>
         
@@ -277,12 +281,16 @@
     <div id="pseudo-choice-modal">
         <div class="modal-content pwd-modal-box">
             <h2 style="color:#3498db; margin-top: 0;">Publication des résultats</h2>
-            <p style="font-size: 1.1em; margin-bottom: 20px;">Ton identifiant actuel est le <strong style="color:#e74c3c;" id="pseudo-choice-display"></strong>.<br><br>Souhaites-tu t'afficher publiquement sur le classement avec ton prénom ou un pseudonyme ?</p>
-            <input type="text" id="optional-pseudo-input" placeholder="Nouveau pseudo (Optionnel)" autocomplete="off" maxlength="15" style="display: none; margin-top: 10px;">
+            
+            <p style="font-size: 1.1em; margin-bottom: 20px;">
+                Désires tu modifier ton nom de joueur (<strong style="color:#e74c3c;" id="pseudo-choice-display"></strong>) ou souhaites tu rester anonyme ?
+            </p>
+            
+            <input type="text" id="optional-pseudo-input" placeholder="Nouveau pseudo" autocomplete="off" maxlength="15" style="display: none; margin-top: 10px;">
             
             <div id="pseudo-buttons-step1" style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
-                <button class="secondary-btn" style="background-color: #7f8c8d; margin: 0; width: 45%;" onclick="skipPseudoChoice()">Non, rester anonyme</button>
-                <button class="main-btn" style="margin: 0; width: 45%; padding: 15px;" onclick="showPseudoInput()">Oui, choisir un nom</button>
+                <button class="secondary-btn" style="background-color: #7f8c8d; margin: 0; width: 45%;" onclick="skipPseudoChoice()">Non</button>
+                <button class="main-btn" style="margin: 0; width: 45%; padding: 15px;" onclick="showPseudoInput()">Oui</button>
             </div>
             
             <div id="pseudo-buttons-step2" style="display: none; gap: 10px; justify-content: center; margin-top: 15px;">
@@ -306,6 +314,6 @@
     </div>
 
     <script src="questions.js"></script>
-    <script type="module" src="script.js?v=21"></script>
+    <script type="module" src="script.js?v=22"></script>
 </body>
 </html>

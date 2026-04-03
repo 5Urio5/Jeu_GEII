@@ -24,7 +24,6 @@ const DIFF_LABELS = {
 // ==========================================
 // FIREBASE - CONNEXION BASE DE DONNÉES TEMPS RÉEL
 // ==========================================
-// ⚠️ Correction de la version Firebase en 10.8.1 (La 12.11.0 n'existe pas et faisait crasher le script)
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-analytics.js";
 import { getDatabase, ref, push, get, set, runTransaction } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
@@ -45,7 +44,7 @@ const analytics = getAnalytics(app);
 const db = getDatabase(app);
 
 // ==========================================
-// VARIABLES GLOBALES (Toujours déclarer avant l'utilisation !)
+// VARIABLES GLOBALES
 // ==========================================
 let playerName = ""; 
 let playerPin = ""; 
@@ -90,6 +89,7 @@ window.showScreensaver = showScreensaver;
 window.hideScreensaver = hideScreensaver;
 window.goToNextQuestion = goToNextQuestion; 
 window.togglePasswordVisibility = togglePasswordVisibility;
+window.togglePlayerPasswordVisibility = togglePlayerPasswordVisibility; // NOUVEAU
 window.generatePlayerPDF = generatePlayerPDF; 
 window.generateAdminPDF = generateAdminPDF;
 window.openQuestionEditor = openQuestionEditor; 
@@ -99,7 +99,6 @@ window.editQuestion = editQuestion;
 window.saveQuestion = saveQuestion; 
 window.deleteQuestion = deleteQuestion;
 window.resetQuestionsToDefault = resetQuestionsToDefault;
-// 🔥 CORRECTION : L'ancienne ligne "window.triggerCheatCode" qui faisait tout planter a bien été retirée !
 window.submitNewPassword = submitNewPassword;
 window.filterPodium = filterPodium;
 window.editPseudo = editPseudo;
@@ -125,7 +124,6 @@ async function loadQuestionsFromFirebase() {
         if (snap.exists()) {
             dynamicDB = snap.val();
         } else {
-            // Sécurité anti-crash si le fichier local "questions.js" n'est pas chargé
             let localDB = (typeof DB !== 'undefined') ? DB : [];
             await set(ref(db, 'questions'), localDB);
             dynamicDB = localDB;
@@ -169,6 +167,19 @@ function askPassword(customTitle = "⚠️ ZONE SÉCURISÉE ⚠️", customDesc 
 function togglePasswordVisibility() {
     const input = document.getElementById('admin-pwd-input');
     const toggleBtn = document.getElementById('toggle-pwd-btn');
+    if (input.type === 'password') { 
+        input.type = 'text'; 
+        toggleBtn.innerText = '🙈'; 
+    } else { 
+        input.type = 'password'; 
+        toggleBtn.innerText = '👁️'; 
+    }
+}
+
+// NOUVEAU : Masquer/Afficher le mot de passe du Joueur
+function togglePlayerPasswordVisibility() {
+    const input = document.getElementById('new-player-pin');
+    const toggleBtn = document.getElementById('toggle-player-pwd-btn');
     if (input.type === 'password') { 
         input.type = 'text'; 
         toggleBtn.innerText = '🙈'; 
@@ -281,6 +292,22 @@ function goToStart() {
     isDemoMode = false;
     setRandomBackground(); 
     resetIdleTimer(); 
+    
+    // 🔥 NOUVEAU : Réinitialiser la zone du mot de passe
+    let pinInput = document.getElementById('new-player-pin');
+    if(pinInput) {
+        pinInput.value = '';
+        pinInput.type = 'password';
+        document.getElementById('toggle-player-pwd-btn').innerText = '👁️';
+    }
+    
+    // 🔥 NOUVEAU : Purger intégralement les données du questionnaire précédent
+    document.getElementById('survey-q1').value = "";
+    document.getElementById('survey-q2').value = "";
+    document.getElementById('survey-q3').value = "";
+    document.getElementById('survey-q4').value = "";
+    document.getElementById('survey-q5').value = "";
+
     slideTo('screen-start');
 }
 
@@ -322,6 +349,17 @@ async function startQuiz() {
     if (!audioCtx) audioCtx = new AudioContextClass(); 
     if (audioCtx.state === 'suspended') audioCtx.resume();
 
+    // Réinitialisation des formulaires par sécurité
+    let pinInput = document.getElementById('new-player-pin');
+    pinInput.value = '';
+    pinInput.type = 'password';
+    document.getElementById('toggle-player-pwd-btn').innerText = '👁️';
+    document.getElementById('survey-q1').value = "";
+    document.getElementById('survey-q2').value = "";
+    document.getElementById('survey-q3').value = "";
+    document.getElementById('survey-q4').value = "";
+    document.getElementById('survey-q5').value = "";
+
     playerPin = ""; 
     scoresPoints = {AII: 0, EME: 0, ESE: 0}; 
     scoresCount = {AII: 0, EME: 0, ESE: 0};
@@ -330,7 +368,6 @@ async function startQuiz() {
     playerSessionDetails = [];
     currentAssignedNum = null;
 
-    // Mixage des questions
     let selected = [];
     ['AII', 'EME', 'ESE'].forEach(cat => {
         let catQ = dynamicDB.filter(q => q.cat === cat);
@@ -395,7 +432,7 @@ async function startQuiz() {
         return; 
     }
 
-    // MODE NORMAL : Algorithme anti-doublon et recyclage des numéros
+    // MODE NORMAL 
     const idsRef = ref(db, 'metadata/usedIds');
     try {
         await runTransaction(idsRef, (currentData) => {
@@ -607,7 +644,6 @@ function goToNextQuestion() {
 // ==========================================
 // CRÉATION MOT DE PASSE ET RÉSULTATS
 // ==========================================
-
 async function submitNewPassword() {
     let pinInput = document.getElementById('new-player-pin').value.trim();
     if (!pinInput) return alert("Hé ! Tu dois créer un mot de passe pour protéger tes résultats !");
@@ -1556,7 +1592,7 @@ function hideScreensaver() {
 
 resetIdleTimer();
 
-// L'écouteur global du clavier, corrigé pour empêcher la touche Entrée de valider en arrière-plan
+
 document.addEventListener('keydown', function(e) {
     const activeScreen = document.querySelector('.active-screen'); 
     const screensaver = document.getElementById('screensaver');
@@ -1586,6 +1622,7 @@ document.addEventListener('keydown', function(e) {
     }
     
     if (e.key === 'Enter') { 
+        // Gestion des modales en priorité
         if (isPasswordOpen) {
             document.getElementById('submit-pwd-btn').click();
             return;
@@ -1602,15 +1639,21 @@ document.addEventListener('keydown', function(e) {
             return; 
         }
 
+
         if (activeScreen) { 
             if (activeScreen.id === 'screen-start') {
                 startQuiz();
             } else if (activeScreen.id === 'screen-intermediate') { 
                 goToNextQuestion(); 
-            } 
+            } else if (activeScreen.id === 'screen-create-password') {
+                submitNewPassword();
+            } else if (activeScreen.id === 'screen-survey') {
+                submitSurveyAndGoToPodium();
+            }
         } 
     }
     
+    // FLÈCHES DU CLAVIER (Navigation dans les réponses)
     if (activeScreen && activeScreen.id === 'screen-game' && !anyModalOpen) {
         if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
             e.preventDefault(); 
