@@ -90,7 +90,7 @@ window.showScreensaver = showScreensaver;
 window.hideScreensaver = hideScreensaver;
 window.goToNextQuestion = goToNextQuestion; 
 window.togglePasswordVisibility = togglePasswordVisibility;
-window.togglePlayerPasswordVisibility = togglePlayerPasswordVisibility; 
+window.togglePlayerPasswordVisibility = togglePlayerPasswordVisibility;
 window.generatePlayerPDF = generatePlayerPDF; 
 window.generateAdminPDF = generateAdminPDF;
 window.openQuestionEditor = openQuestionEditor; 
@@ -123,15 +123,24 @@ async function loadQuestionsFromFirebase() {
     try {
         const snap = await get(ref(db, 'questions'));
         if (snap.exists()) {
-            dynamicDB = snap.val();
+            let rawData = snap.val();
+            let tempDB = [];
+            
+            if (Array.isArray(rawData)) {
+                tempDB = rawData;
+            } else if (typeof rawData === 'object') {
+                tempDB = Object.values(rawData);
+            }
+            
+            dynamicDB = tempDB.filter(q => q !== null && q !== undefined && typeof q === 'object' && q.q && q.cat);
         } else {
-            let localDB = (typeof DB !== 'undefined') ? DB : [];
+            let localDB = (typeof window.DB !== 'undefined') ? window.DB : (typeof DB !== 'undefined' ? DB : []);
             await set(ref(db, 'questions'), localDB);
             dynamicDB = localDB;
         }
     } catch (error) {
         console.error("Erreur de chargement des questions, utilisation locale.", error);
-        dynamicDB = (typeof DB !== 'undefined') ? DB : []; 
+        dynamicDB = (typeof window.DB !== 'undefined') ? window.DB : (typeof DB !== 'undefined' ? DB : []); 
     }
 }
 loadQuestionsFromFirebase();
@@ -177,7 +186,6 @@ function togglePasswordVisibility() {
     }
 }
 
-// NOUVEAU : Masquer/Afficher le mot de passe du Joueur
 function togglePlayerPasswordVisibility() {
     const input = document.getElementById('new-player-pin');
     const toggleBtn = document.getElementById('toggle-player-pwd-btn');
@@ -295,7 +303,6 @@ function goToStart() {
     setRandomBackground(); 
     resetIdleTimer(); 
     
-    // 🔥 NOUVEAU : Réinitialiser la zone du mot de passe
     let pinInput = document.getElementById('new-player-pin');
     if(pinInput) {
         pinInput.value = '';
@@ -303,7 +310,6 @@ function goToStart() {
         document.getElementById('toggle-player-pwd-btn').innerText = '👁️';
     }
     
-    // 🔥 NOUVEAU : Purger intégralement les données du questionnaire précédent
     document.getElementById('survey-q1').value = "";
     document.getElementById('survey-q2').value = "";
     document.getElementById('survey-q3').value = "";
@@ -351,11 +357,13 @@ async function startQuiz() {
     if (!audioCtx) audioCtx = new AudioContextClass(); 
     if (audioCtx.state === 'suspended') audioCtx.resume();
 
-    // Réinitialisation des formulaires par sécurité
     let pinInput = document.getElementById('new-player-pin');
-    pinInput.value = '';
-    pinInput.type = 'password';
-    document.getElementById('toggle-player-pwd-btn').innerText = '👁️';
+    if(pinInput) {
+        pinInput.value = '';
+        pinInput.type = 'password';
+        document.getElementById('toggle-player-pwd-btn').innerText = '👁️';
+    }
+    
     document.getElementById('survey-q1').value = "";
     document.getElementById('survey-q2').value = "";
     document.getElementById('survey-q3').value = "";
@@ -372,26 +380,42 @@ async function startQuiz() {
     currentScoreId = null;
 
     let selected = [];
+    let safeDB = dynamicDB.filter(q => q !== null && q !== undefined && q.cat);
+
     ['AII', 'EME', 'ESE'].forEach(cat => {
-        let catQ = dynamicDB.filter(q => q && q.cat === cat);
+        let catQ = safeDB.filter(q => q.cat === cat);
         let qCom = getRandom(catQ.filter(q => q.diff === "Com"), 2);
         let qSTI = getRandom(catQ.filter(q => q.diff === "STI"), 3);
         let qBU1 = getRandom(catQ.filter(q => q.diff === "BU1"), 3);
         let qBU2 = getRandom(catQ.filter(q => q.diff === "BU2"), 2);
         selected = selected.concat(qCom, qSTI, qBU1, qBU2);
     });
-    
-    selected = selected.filter(q => q !== undefined && q !== null);
-    currentQuestions = selected.sort(() => 0.5 - Math.random());
 
-    // SIMULATION MODE DÉMO
+    selected = selected.filter(q => q !== undefined && q !== null);
+    
+    if (selected.length < 30) {
+        let missingCount = 30 - selected.length;
+        let remainingQuestions = safeDB.filter(q => !selected.includes(q));
+        let fillQuestions = getRandom(remainingQuestions, missingCount);
+        selected = selected.concat(fillQuestions);
+    }
+
+    currentQuestions = selected.sort(() => 0.5 - Math.random());
+    totalQuestions = currentQuestions.length;
+
+    if (totalQuestions === 0) {
+        alert("❌ Erreur : Aucune question trouvée dans la base de données !");
+        return;
+    }
+
     if (isDemoMode) {
         isDemoMode = false; 
         playerName = "PlayerManon (Démo)";
         
-        for(let i = 0; i < 29; i++) {
+        let questionsToSimulate = totalQuestions - 1;
+        
+        for(let i = 0; i < questionsToSimulate; i++) {
             let q = currentQuestions[i];
-            if(!q) continue;
             let isCorrect = Math.random() > 0.3; 
             let timeTaken = Math.floor(Math.random() * 15) + 2; 
             let timeLeftSim = timeLimit - timeTaken;
@@ -417,16 +441,16 @@ async function startQuiz() {
             });
         }
         
-        currentQIndex = 29; 
+        currentQIndex = questionsToSimulate; 
         
         let progContainer = document.getElementById('progress-container'); 
         progContainer.innerHTML = '';
-        for(let i=0; i<30; i++) { 
+        for(let i=0; i<totalQuestions; i++) { 
             let box = document.createElement('div');
             box.className = 'progress-box';
             box.id = `box-${i}`;
-            if (i < 29) {
-                if (playerSessionDetails[i] && playerSessionDetails[i].isCorrect) box.classList.add('prog-correct');
+            if (i < questionsToSimulate) {
+                if (playerSessionDetails[i].isCorrect) box.classList.add('prog-correct');
                 else box.classList.add('prog-wrong');
             }
             progContainer.appendChild(box);
@@ -438,7 +462,6 @@ async function startQuiz() {
         return; 
     }
 
-    // MODE NORMAL 
     const idsRef = ref(db, 'metadata/usedIds');
     try {
         await runTransaction(idsRef, (currentData) => {
@@ -461,7 +484,7 @@ async function startQuiz() {
     
     let progContainer = document.getElementById('progress-container'); 
     progContainer.innerHTML = '';
-    for(let i=0; i<30; i++) { 
+    for(let i=0; i<totalQuestions; i++) { 
         progContainer.innerHTML += `<div class="progress-box" id="box-${i}"></div>`; 
     }
     
@@ -524,6 +547,7 @@ function loadQuestion() {
         
         let pct = (timeLeft / timeLimit) * 100; 
         timerBar.style.width = pct + "%";
+        
         if (pct < 50 && pct > 20) timerBar.style.backgroundColor = "#f1c40f"; 
         if (pct <= 20) timerBar.style.backgroundColor = "#e74c3c"; 
 
@@ -641,7 +665,15 @@ function goToNextQuestion() {
         playSound('drumroll'); 
         setTimeout(async () => { 
             document.getElementById('cp-player-name').innerText = playerName;
-            document.getElementById('new-player-pin').value = '';
+            
+            let pinInput = document.getElementById('new-player-pin');
+            if(pinInput) {
+                pinInput.value = '';
+                pinInput.type = 'password';
+                let togglePlayerBtn = document.getElementById('toggle-player-pwd-btn');
+                if (togglePlayerBtn) togglePlayerBtn.innerText = '👁️';
+            }
+            
             slideTo('screen-create-password');
         }, 3000); 
     }
@@ -1027,9 +1059,12 @@ async function changePlayerPassword(playerId) {
 
 function closeModal(modalId) { 
     if(modalId) {
-        document.getElementById(modalId).classList.remove('show'); 
+        let m = document.getElementById(modalId);
+        if(m) m.classList.remove('show'); 
     } else {
-        document.querySelectorAll('.modal-content').forEach(m => m.parentElement.classList.remove('show'));
+        document.querySelectorAll('.modal-content').forEach(m => {
+            m.parentElement.classList.remove('show');
+        });
     }
 }
 
@@ -1348,10 +1383,54 @@ async function generateAdminPDF() {
     }
 }
 
+function exportQuestionsPDF() {
+    closeModal('admin-hub-modal');
+    
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('landscape');
+    
+    doc.setFont("helvetica", "bold"); 
+    doc.setFontSize(16);
+    doc.text("BASE DE DONNÉES DES QUESTIONS GEII", 14, 15);
+    
+    let tableData = [];
+    
+    let sortedDB = [...dynamicDB].sort((a, b) => {
+        if (a.cat === b.cat) return a.diff.localeCompare(b.diff);
+        return a.cat.localeCompare(b.cat);
+    });
+
+    sortedDB.forEach(q => { 
+        tableData.push([ 
+            q.cat, 
+            DIFF_LABELS[q.diff] || q.diff, 
+            q.q, 
+            q.opt[q.ans], 
+            q.trivia 
+        ]); 
+    }); 
+    
+    doc.autoTable({
+        startY: 25,
+        head: [['Catégorie', 'Difficulté', 'Question', 'Bonne Réponse', 'Le Saviez-vous ?']],
+        body: tableData,
+        headStyles: { fillColor: [52, 152, 219] },
+        styles: { fontSize: 9 },
+        columnStyles: { 
+            0: { cellWidth: 20 }, 
+            1: { cellWidth: 20 }, 
+            2: { cellWidth: 80 }, 
+            3: { cellWidth: 50 },
+            4: { cellWidth: 90 }
+        }
+    });
+
+    doc.save(`Questions_GEII.pdf`);
+}
+
 // ==========================================
 // EDITEUR DE QUESTIONS (ADMIN)
 // ==========================================
-
 function openQuestionEditor() {
     closeModal('admin-hub-modal');
     document.getElementById('filter-cat').value = 'ALL';
@@ -1498,51 +1577,6 @@ async function saveQuestion(index) {
     } catch(e) { 
         alert("Erreur lors de la sauvegarde Firebase."); 
     }
-}
-
-function exportQuestionsPDF() {
-    closeModal('admin-hub-modal');
-    
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF('landscape');
-    
-    doc.setFont("helvetica", "bold"); 
-    doc.setFontSize(16);
-    doc.text("BASE DE DONNÉES DES QUESTIONS GEII", 14, 15);
-    
-    let tableData = [];
-    
-    let sortedDB = [...dynamicDB].sort((a, b) => {
-        if (a.cat === b.cat) return a.diff.localeCompare(b.diff);
-        return a.cat.localeCompare(b.cat);
-    });
-
-    sortedDB.forEach(q => { 
-        tableData.push([ 
-            q.cat, 
-            DIFF_LABELS[q.diff] || q.diff, 
-            q.q, 
-            q.opt[q.ans], 
-            q.trivia 
-        ]); 
-    }); 
-    
-    doc.autoTable({
-        startY: 25,
-        head: [['Catégorie', 'Difficulté', 'Question', 'Bonne Réponse', 'Le Saviez-vous ?']],
-        body: tableData,
-        headStyles: { fillColor: [52, 152, 219] },
-        styles: { fontSize: 9 },
-        columnStyles: { 
-            0: { cellWidth: 20 }, 
-            1: { cellWidth: 20 }, 
-            2: { cellWidth: 80 }, 
-            3: { cellWidth: 50 },
-            4: { cellWidth: 90 }
-        }
-    });
-
-    doc.save(`Questions_GEII.pdf`);
 }
 
 // ==========================================
