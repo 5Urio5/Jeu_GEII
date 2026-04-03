@@ -5,6 +5,7 @@
 // ==========================================
 const ADMIN_PASSWORD = "iutgeii"; 
 
+// Coefficients de difficulté appliqués aux points
 const DIFF_WEIGHTS = { 
     "Com": 0.75, 
     "STI": 1, 
@@ -12,6 +13,7 @@ const DIFF_WEIGHTS = {
     "BU2": 1.5 
 };
 
+// Traduction visuelle des catégories pour les joueurs (Pastilles & Excel)
 const DIFF_LABELS = { 
     "Com": "CG", 
     "STI": "STI2D", 
@@ -20,7 +22,7 @@ const DIFF_LABELS = {
 };
 
 // ==========================================
-// FIREBASE
+// FIREBASE - CONNEXION BASE DE DONNÉES TEMPS RÉEL
 // ==========================================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-analytics.js";
@@ -48,6 +50,7 @@ let playerName = "";
 let playerPin = ""; 
 let currentQuestions = []; 
 let currentQIndex = 0;
+
 let scoresPoints = {AII: 0, EME: 0, ESE: 0}; 
 let scoresCount = {AII: 0, EME: 0, ESE: 0};
 let scoreTotal = 0; 
@@ -62,7 +65,7 @@ let idleTimer;
 const IDLE_TIME = 120000; 
 
 let dynamicDB = [];
-let isDbLoaded = false; // Sécurité de chargement
+let isDbLoaded = false;
 let resultsChartInstance = null;
 let modalChartInstance = null;
 let currentViewingPlayerId = null; 
@@ -107,7 +110,6 @@ window.editPseudo = editPseudo;
 window.changePlayerPassword = changePlayerPassword;
 window.openAdminHub = openAdminHub;
 window.startDemoMode = startDemoMode;
-window.exportQuestionsPDF = exportQuestionsPDF;
 window.renderEditorList = renderEditorList;
 window.openPseudoChoiceModal = openPseudoChoiceModal;
 window.skipPseudoChoice = skipPseudoChoice;
@@ -120,6 +122,46 @@ window.generateQuestionsPDF = generateQuestionsPDF;
 
 
 // ==========================================
+// LIAISONS SÉCURISÉES DE LA TOUCHE ENTRÉE
+// ==========================================
+const pinInputNode = document.getElementById('new-player-pin');
+if(pinInputNode) {
+    pinInputNode.addEventListener('keydown', function(e) {
+        if(e.key === 'Enter') {
+            e.preventDefault();
+            e.stopPropagation();
+            submitNewPassword();
+        }
+    });
+}
+
+const pseudoInputNode = document.getElementById('optional-pseudo-input');
+if(pseudoInputNode) {
+    pseudoInputNode.addEventListener('keydown', function(e) {
+        if(e.key === 'Enter') {
+            e.preventDefault();
+            e.stopPropagation();
+            savePseudoChoice();
+        }
+    });
+}
+
+const surveyScreenNode = document.getElementById('screen-survey');
+if(surveyScreenNode) {
+    surveyScreenNode.addEventListener('keydown', function(e) {
+        if(e.key === 'Enter') {
+            if (document.activeElement && document.activeElement.tagName === 'TEXTAREA') {
+                return;
+            }
+            e.preventDefault();
+            e.stopPropagation();
+            submitSurveyAndGoToPodium();
+        }
+    });
+}
+
+
+// ==========================================
 // INITIALISATION DE LA BASE DE DONNÉES
 // ==========================================
 async function loadQuestionsFromFirebase() {
@@ -129,14 +171,13 @@ async function loadQuestionsFromFirebase() {
             let rawData = snap.val();
             let tempDB = [];
             
-            // Firebase peut renvoyer un tableau troué ou un objet si on a effacé des IDs
             if (Array.isArray(rawData)) {
                 tempDB = rawData;
             } else if (typeof rawData === 'object') {
                 tempDB = Object.values(rawData);
             }
             
-            // Bouclier Anti-Crash : On filtre drastiquement les lignes vides, null ou corrompues
+            // Bouclier Anti-Crash : On filtre drastiquement les lignes vides
             dynamicDB = tempDB.filter(q => q !== null && q !== undefined && typeof q === 'object' && q.q && q.cat);
             
         } else {
@@ -145,13 +186,14 @@ async function loadQuestionsFromFirebase() {
             dynamicDB = localDB;
         }
     } catch (error) {
-        console.error("Erreur Firebase, utilisation DB locale.", error);
+        console.error("Erreur de chargement des questions, utilisation locale.", error);
         dynamicDB = (typeof window.DB !== 'undefined') ? window.DB : (typeof DB !== 'undefined' ? DB : []); 
     } finally {
         isDbLoaded = true;
     }
 }
 loadQuestionsFromFirebase();
+
 
 // ==========================================
 // UTILITAIRES ET SÉCURITÉ
@@ -180,17 +222,28 @@ function askPassword(customTitle = "⚠️ ZONE SÉCURISÉE ⚠️", customDesc 
             input.onkeydown = null;
         };
         
-        submitBtn.onclick = () => { cleanup(); resolve(input.value); };
-        cancelBtn.onclick = () => { cleanup(); resolve(null); };
+        submitBtn.onclick = () => { 
+            cleanup(); 
+            resolve(input.value); 
+        };
+        
+        cancelBtn.onclick = () => { 
+            cleanup(); 
+            resolve(null); 
+        };
         
         input.onkeydown = (e) => { 
             if (e.key === 'Enter') { 
-                e.preventDefault(); e.stopPropagation();
-                cleanup(); resolve(input.value); 
+                e.preventDefault();
+                e.stopPropagation();
+                cleanup(); 
+                resolve(input.value); 
             } 
             if (e.key === 'Escape') { 
-                e.preventDefault(); e.stopPropagation();
-                cleanup(); resolve(null); 
+                e.preventDefault();
+                e.stopPropagation();
+                cleanup(); 
+                resolve(null); 
             }
         };
     });
@@ -200,9 +253,11 @@ function togglePasswordVisibility() {
     const input = document.getElementById('admin-pwd-input');
     const toggleBtn = document.getElementById('toggle-pwd-btn');
     if (input.type === 'password') { 
-        input.type = 'text'; toggleBtn.innerText = '🙈'; 
+        input.type = 'text'; 
+        toggleBtn.innerText = '🙈'; 
     } else { 
-        input.type = 'password'; toggleBtn.innerText = '👁️'; 
+        input.type = 'password'; 
+        toggleBtn.innerText = '👁️'; 
     }
 }
 
@@ -210,16 +265,24 @@ function togglePlayerPasswordVisibility() {
     const input = document.getElementById('new-player-pin');
     const toggleBtn = document.getElementById('toggle-player-pwd-btn');
     if (input.type === 'password') { 
-        input.type = 'text'; toggleBtn.innerText = '🙈'; 
+        input.type = 'text'; 
+        toggleBtn.innerText = '🙈'; 
     } else { 
-        input.type = 'password'; toggleBtn.innerText = '👁️'; 
+        input.type = 'password'; 
+        toggleBtn.innerText = '👁️'; 
     }
 }
 
 function sanitizeString(str) {
     if(!str) return "";
     return str.replace(/[&<>'"]/g, function(tag) {
-        const charsToReplace = { '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' };
+        const charsToReplace = { 
+            '&': '&amp;', 
+            '<': '&lt;', 
+            '>': '&gt;', 
+            "'": '&#39;', 
+            '"': '&quot;' 
+        };
         return charsToReplace[tag] || tag;
     });
 }
@@ -230,8 +293,12 @@ function setRandomBackground() {
 }
 
 function playSound(type) {
-    if (!audioCtx) audioCtx = new AudioContextClass();
-    if (audioCtx.state === 'suspended') audioCtx.resume();
+    if (!audioCtx) {
+        audioCtx = new AudioContextClass();
+    }
+    if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+    }
     
     const osc = audioCtx.createOscillator(); 
     const gain = audioCtx.createGain();
@@ -242,39 +309,64 @@ function playSound(type) {
     const now = audioCtx.currentTime;
     
     if (type === 'correct') { 
-        osc.type = 'sine'; osc.frequency.setValueAtTime(880, now); osc.frequency.setValueAtTime(1046, now + 0.1); 
-        gain.gain.setValueAtTime(0.5, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3); 
-        osc.start(now); osc.stop(now + 0.3); 
+        osc.type = 'sine'; 
+        osc.frequency.setValueAtTime(880, now); 
+        osc.frequency.setValueAtTime(1046, now + 0.1); 
+        gain.gain.setValueAtTime(0.5, now); 
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3); 
+        osc.start(now); 
+        osc.stop(now + 0.3); 
     } 
     else if (type === 'wrong' || type === 'timeout') { 
-        osc.type = 'sawtooth'; osc.frequency.setValueAtTime(150, now); 
-        gain.gain.setValueAtTime(0.5, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4); 
-        osc.start(now); osc.stop(now + 0.4); 
+        osc.type = 'sawtooth'; 
+        osc.frequency.setValueAtTime(150, now); 
+        gain.gain.setValueAtTime(0.5, now); 
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4); 
+        osc.start(now); 
+        osc.stop(now + 0.4); 
     } 
     else if (type === 'fast-tick') { 
-        osc.type = 'square'; osc.frequency.setValueAtTime(800, now); 
-        gain.gain.setValueAtTime(0.1, now); gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05); 
-        osc.start(now); osc.stop(now + 0.05); 
+        osc.type = 'square'; 
+        osc.frequency.setValueAtTime(800, now); 
+        gain.gain.setValueAtTime(0.1, now); 
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05); 
+        osc.start(now); 
+        osc.stop(now + 0.05); 
     } 
     else if (type === 'tick') { 
-        osc.type = 'square'; osc.frequency.setValueAtTime(400, now); 
-        gain.gain.setValueAtTime(0.1, now); gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05); 
-        osc.start(now); osc.stop(now + 0.05); 
+        osc.type = 'square'; 
+        osc.frequency.setValueAtTime(400, now); 
+        gain.gain.setValueAtTime(0.1, now); 
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05); 
+        osc.start(now); 
+        osc.stop(now + 0.05); 
     } 
     else if (type === 'drumroll') { 
-        osc.type = 'sawtooth'; osc.frequency.setValueAtTime(60, now); 
-        const lfo = audioCtx.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = 25; 
-        const lfoGain = audioCtx.createGain(); lfoGain.gain.value = 50; 
-        lfo.connect(lfoGain); lfoGain.connect(osc.frequency); 
-        lfo.start(now); lfo.stop(now + 3); 
-        gain.gain.setValueAtTime(0, now); gain.gain.linearRampToValueAtTime(0.5, now + 2); gain.gain.linearRampToValueAtTime(0, now + 3); 
-        osc.start(now); osc.stop(now + 3); 
+        osc.type = 'sawtooth'; 
+        osc.frequency.setValueAtTime(60, now); 
+        const lfo = audioCtx.createOscillator(); 
+        lfo.type = 'sine'; 
+        lfo.frequency.value = 25; 
+        const lfoGain = audioCtx.createGain(); 
+        lfoGain.gain.value = 50; 
+        lfo.connect(lfoGain); 
+        lfoGain.connect(osc.frequency); 
+        lfo.start(now); 
+        lfo.stop(now + 3); 
+        gain.gain.setValueAtTime(0, now); 
+        gain.gain.linearRampToValueAtTime(0.5, now + 2); 
+        gain.gain.linearRampToValueAtTime(0, now + 3); 
+        osc.start(now); 
+        osc.stop(now + 3); 
     }
 }
 
 function slideTo(screenId) {
     const active = document.querySelector('.active-screen');
-    if (active && active.id === screenId) return; 
+    
+    if (active && active.id === screenId) {
+        return; 
+    }
     
     if (active) { 
         active.classList.remove('active-screen'); 
@@ -288,7 +380,9 @@ function slideTo(screenId) {
     const nextScreen = document.getElementById(screenId); 
     nextScreen.classList.remove('hidden'); 
     nextScreen.classList.add('slide-in-right'); 
+    
     void nextScreen.offsetWidth; 
+    
     nextScreen.classList.remove('slide-in-right'); 
     nextScreen.classList.add('active-screen');
 }
@@ -303,19 +397,21 @@ function goToStart() {
     setRandomBackground(); 
     resetIdleTimer(); 
     
-    // Purge de l'écran du mot de passe
     let pinInput = document.getElementById('new-player-pin');
     if(pinInput) {
         pinInput.value = '';
         pinInput.type = 'password';
         let togglePlayerBtn = document.getElementById('toggle-player-pwd-btn');
-        if (togglePlayerBtn) togglePlayerBtn.innerText = '👁️';
+        if (togglePlayerBtn) {
+            togglePlayerBtn.innerText = '👁️';
+        }
     }
     
-    // Purge complète du questionnaire de satisfaction
     for(let i = 1; i <= 5; i++) {
         let qElement = document.getElementById('survey-q' + i);
-        if(qElement) qElement.value = "";
+        if(qElement) {
+            qElement.value = "";
+        }
     }
 
     slideTo('screen-start');
@@ -328,7 +424,9 @@ async function cancelQuiz() {
         if (currentAssignedNum !== null) {
             try { 
                 await set(ref(db, `metadata/usedIds/${currentAssignedNum}`), null); 
-            } catch(e) {}
+            } catch(e) {
+                console.error(e);
+            }
             currentAssignedNum = null;
         }
         
@@ -343,6 +441,7 @@ function getRandom(arr, n) {
 
 async function openAdminHub() {
     let pwd = await askPassword("🔒 ESPACE ADMINISTRATEUR", "Veuillez entrer le mot de passe administrateur :");
+    
     if (pwd === ADMIN_PASSWORD) {
         document.getElementById('admin-hub-modal').classList.add('show');
     } else if (pwd !== null) {
@@ -357,20 +456,23 @@ function startDemoMode() {
 }
 
 async function startQuiz() {
-    if (!audioCtx) audioCtx = new AudioContextClass(); 
-    if (audioCtx.state === 'suspended') audioCtx.resume();
+    if (!audioCtx) {
+        audioCtx = new AudioContextClass(); 
+    }
+    if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+    }
 
-    // Vérification de sécurité pour le chargement
     if (!isDbLoaded) {
         alert("⚠️ Connexion à la base de données en cours... Veuillez patienter quelques secondes.");
         return;
     }
+    
     if (!dynamicDB || dynamicDB.length === 0) {
         alert("❌ Erreur : Aucune question trouvée dans la base de données. Veuillez en ajouter depuis l'espace administrateur.");
         return;
     }
 
-    // Purge
     let pinInput = document.getElementById('new-player-pin');
     if(pinInput) {
         pinInput.value = '';
@@ -378,6 +480,7 @@ async function startQuiz() {
         let togglePlayerBtn = document.getElementById('toggle-player-pwd-btn');
         if (togglePlayerBtn) togglePlayerBtn.innerText = '👁️';
     }
+    
     for(let i = 1; i <= 5; i++) {
         let qElement = document.getElementById('survey-q' + i);
         if(qElement) qElement.value = "";
@@ -393,17 +496,19 @@ async function startQuiz() {
     currentScoreId = null;
 
     let selected = [];
+    
     ['AII', 'EME', 'ESE'].forEach(cat => {
         let catQ = dynamicDB.filter(q => q.cat === cat);
         let qCom = getRandom(catQ.filter(q => q.diff === "Com"), 2);
         let qSTI = getRandom(catQ.filter(q => q.diff === "STI"), 3);
         let qBU1 = getRandom(catQ.filter(q => q.diff === "BU1"), 3);
         let qBU2 = getRandom(catQ.filter(q => q.diff === "BU2"), 2);
+        
         selected = selected.concat(qCom, qSTI, qBU1, qBU2);
     });
 
-    // Si on a moins de 30 questions parfaites, on comble les trous avec le reste de la base
     selected = selected.filter(q => q !== undefined && q !== null);
+    
     if (selected.length < 30) {
         let missingCount = 30 - selected.length;
         let remainingQuestions = dynamicDB.filter(q => !selected.includes(q));
@@ -414,7 +519,11 @@ async function startQuiz() {
     currentQuestions = selected.sort(() => 0.5 - Math.random());
     totalQuestions = currentQuestions.length;
 
-    // SIMULATION MODE DÉMO
+    if (totalQuestions === 0) {
+        alert("❌ Erreur : Aucune question trouvée dans la base de données !");
+        return;
+    }
+
     if (isDemoMode) {
         isDemoMode = false; 
         playerName = "PlayerManon (Démo)";
@@ -452,32 +561,41 @@ async function startQuiz() {
         
         let progContainer = document.getElementById('progress-container'); 
         progContainer.innerHTML = '';
+        
         for(let i=0; i<totalQuestions; i++) { 
             let box = document.createElement('div');
             box.className = 'progress-box';
             box.id = `box-${i}`;
+            
             if (i < questionsToSimulate) {
-                if (playerSessionDetails[i].isCorrect) box.classList.add('prog-correct');
-                else box.classList.add('prog-wrong');
+                if (playerSessionDetails[i].isCorrect) {
+                    box.classList.add('prog-correct');
+                } else {
+                    box.classList.add('prog-wrong');
+                }
             }
+            
             progContainer.appendChild(box);
         }
         
         document.getElementById('player-display').innerHTML = `👤 ${playerName} <span style="margin-left:20px; color:#f1c40f;" id="live-score">${scoreTotal} pts</span>`;
         slideTo('screen-game'); 
         loadQuestion(); 
+        
         return; 
     }
 
-    // MODE NORMAL
     const idsRef = ref(db, 'metadata/usedIds');
+    
     try {
         await runTransaction(idsRef, (currentData) => {
             let data = currentData || {};
             let id = 1;
+            
             while (data[id.toString()]) {
                 id++;
             }
+            
             data[id.toString()] = true; 
             currentAssignedNum = id; 
             return data;
@@ -492,6 +610,7 @@ async function startQuiz() {
     
     let progContainer = document.getElementById('progress-container'); 
     progContainer.innerHTML = '';
+    
     for(let i=0; i<totalQuestions; i++) { 
         progContainer.innerHTML += `<div class="progress-box" id="box-${i}"></div>`; 
     }
@@ -510,6 +629,7 @@ function loadQuestion() {
     let timerBar = document.getElementById('timer-bar'); 
     timerBar.style.width = "100%"; 
     timerBar.style.backgroundColor = "#2ecc71"; 
+    
     document.getElementById('timer-text').innerText = `⏱️ ${timeLeft}s`;
 
     let qData = currentQuestions[currentQIndex];
@@ -542,7 +662,11 @@ function loadQuestion() {
         btn.className = 'answer-btn'; 
         btn.innerText = opt.text; 
         btn.dataset.idx = opt.originalIndex; 
-        btn.onclick = (e) => processAnswer(opt.originalIndex, qData.ans, e.target);
+        
+        btn.onclick = (e) => {
+            processAnswer(opt.originalIndex, qData.ans, e.target);
+        };
+        
         container.appendChild(btn);
     });
 
@@ -550,16 +674,25 @@ function loadQuestion() {
         timeLeft--; 
         document.getElementById('timer-text').innerText = `⏱️ ${timeLeft}s`;
         
-        if(timeLeft > 0 && timeLeft <= 10) playSound('fast-tick'); 
-        else if (timeLeft > 10) playSound('tick');
+        if(timeLeft > 0 && timeLeft <= 10) {
+            playSound('fast-tick'); 
+        } else if (timeLeft > 10) {
+            playSound('tick');
+        }
         
         let pct = (timeLeft / timeLimit) * 100; 
         timerBar.style.width = pct + "%";
         
-        if (pct < 50 && pct > 20) timerBar.style.backgroundColor = "#f1c40f"; 
-        if (pct <= 20) timerBar.style.backgroundColor = "#e74c3c"; 
+        if (pct < 50 && pct > 20) {
+            timerBar.style.backgroundColor = "#f1c40f"; 
+        }
+        if (pct <= 20) {
+            timerBar.style.backgroundColor = "#e74c3c"; 
+        }
 
-        if (timeLeft <= 0) processAnswer(-1, qData.ans, null); 
+        if (timeLeft <= 0) {
+            processAnswer(-1, qData.ans, null); 
+        }
     }, 1000);
 }
 
@@ -567,12 +700,15 @@ function processAnswer(selectedIndex, correctIndex, clickedBtn) {
     clearInterval(timerInterval);
     
     let allBtns = document.querySelectorAll('.answer-btn'); 
-    allBtns.forEach(b => b.disabled = true);
+    allBtns.forEach(b => {
+        b.disabled = true;
+    });
     
     let qData = currentQuestions[currentQIndex];
     let isTimeout = (selectedIndex === -1); 
     let isCorrect = (selectedIndex === correctIndex);
     let box = document.getElementById(`box-${currentQIndex}`); 
+    
     let timeTaken = timeLimit - timeLeft; 
     let pointsGained = 0;
     
@@ -580,7 +716,11 @@ function processAnswer(selectedIndex, correctIndex, clickedBtn) {
         scoresCount[qData.cat]++; 
         currentStreak++; 
         playSound('correct');
-        if(clickedBtn) clickedBtn.classList.add('btn-correct'); 
+        
+        if(clickedBtn) {
+            clickedBtn.classList.add('btn-correct'); 
+        }
+        
         box.classList.add('prog-correct');
         
         let basePoints = Math.round((timeLeft / timeLimit) * 500) + 500;
@@ -589,13 +729,21 @@ function processAnswer(selectedIndex, correctIndex, clickedBtn) {
         
         scoreTotal += pointsGained; 
         scoresPoints[qData.cat] += pointsGained;
+        
     } else {
         currentStreak = 0; 
         playSound(isTimeout ? 'timeout' : 'wrong');
-        if(clickedBtn) clickedBtn.classList.add('btn-wrong'); 
+        
+        if(clickedBtn) {
+            clickedBtn.classList.add('btn-wrong'); 
+        }
+        
         box.classList.add('prog-wrong');
+        
         allBtns.forEach(b => { 
-            if (parseInt(b.dataset.idx) === correctIndex) b.classList.add('btn-correct'); 
+            if (parseInt(b.dataset.idx) === correctIndex) {
+                b.classList.add('btn-correct'); 
+            }
         });
     }
     
@@ -653,6 +801,7 @@ function showIntermediateScreen(isCorrect, points, trivia, isTimeout) {
     document.getElementById('trivia-text').innerText = trivia; 
     
     let nextBtn = document.getElementById('next-question-btn');
+    
     if (currentQIndex === totalQuestions - 1) {
         nextBtn.innerText = "Voir mon résultat ➡️";
     } else {
@@ -667,10 +816,13 @@ function goToNextQuestion() {
     
     if (currentQIndex < totalQuestions) { 
         slideTo('screen-game'); 
-        setTimeout(() => loadQuestion(), 400); 
+        setTimeout(() => {
+            loadQuestion();
+        }, 400); 
     } else { 
         slideTo('screen-suspense'); 
         playSound('drumroll'); 
+        
         setTimeout(async () => { 
             document.getElementById('cp-player-name').innerText = playerName;
             
@@ -678,8 +830,11 @@ function goToNextQuestion() {
             if(pinInput) {
                 pinInput.value = '';
                 pinInput.type = 'password';
+                
                 let togglePlayerBtn = document.getElementById('toggle-player-pwd-btn');
-                if (togglePlayerBtn) togglePlayerBtn.innerText = '👁️';
+                if (togglePlayerBtn) {
+                    togglePlayerBtn.innerText = '👁️';
+                }
             }
             
             slideTo('screen-create-password');
@@ -693,7 +848,10 @@ function goToNextQuestion() {
 // ==========================================
 async function submitNewPassword() {
     let pinInput = document.getElementById('new-player-pin').value.trim();
-    if (!pinInput) return alert("Hé ! Tu dois créer un mot de passe pour protéger tes résultats !");
+    
+    if (!pinInput) {
+        return alert("Hé ! Tu dois créer un mot de passe pour protéger tes résultats !");
+    }
     
     playerPin = sanitizeString(pinInput); 
     
@@ -714,7 +872,11 @@ const customCanvasBackgroundColor = {
 };
 
 function calculateRadarData(sessionDetails) {
-    let stats = { AII: {maxPts:0, valPts:0}, EME: {maxPts:0, valPts:0}, ESE: {maxPts:0, valPts:0} };
+    let stats = { 
+        AII: {maxPts:0, valPts:0}, 
+        EME: {maxPts:0, valPts:0}, 
+        ESE: {maxPts:0, valPts:0} 
+    };
     
     sessionDetails.forEach(q => {
         let w = DIFF_WEIGHTS[q.diff] || 1; 
@@ -722,7 +884,9 @@ function calculateRadarData(sessionDetails) {
         
         if(stats[q.cat]) {
             stats[q.cat].maxPts += maxQPoints;
-            if(q.isCorrect) stats[q.cat].valPts += q.points;
+            if(q.isCorrect) {
+                stats[q.cat].valPts += q.points;
+            }
         }
     });
     
@@ -837,15 +1001,19 @@ function saveScoreFirebase(name, totalScore, profil, pin, pNum) {
     });
 }
 
+
 // ==========================================
 // CHOIX DU PSEUDO & QUESTIONNAIRE
 // ==========================================
 function openPseudoChoiceModal() {
     document.getElementById('pseudo-choice-display').innerText = playerName;
+    
     document.getElementById('optional-pseudo-input').style.display = 'none';
     document.getElementById('optional-pseudo-input').value = '';
+    
     document.getElementById('pseudo-buttons-step1').style.display = 'flex';
     document.getElementById('pseudo-buttons-step2').style.display = 'none';
+    
     document.getElementById('pseudo-choice-modal').classList.add('show');
 }
 
@@ -858,11 +1026,13 @@ function showPseudoInput() {
     document.getElementById('pseudo-buttons-step1').style.display = 'none';
     document.getElementById('optional-pseudo-input').style.display = 'block';
     document.getElementById('pseudo-buttons-step2').style.display = 'flex';
+    
     document.getElementById('optional-pseudo-input').focus();
 }
 
 async function savePseudoChoice() {
     let input = document.getElementById('optional-pseudo-input').value.trim();
+    
     if (input !== "") {
         let cleanName = sanitizeString(input);
         try {
@@ -870,44 +1040,14 @@ async function savePseudoChoice() {
                 await set(ref(db, `scores/${currentScoreId}/Candidat`), cleanName);
                 playerName = cleanName; 
             }
-        } catch(e) { console.error(e); }
+        } catch(e) { 
+            console.error(e); 
+        }
     }
+    
     closeModal('pseudo-choice-modal');
     slideTo('screen-survey');
 }
-
-// LIEN DE LA TOUCHE ENTRÉE ISOLÉE (Pour les champs texte)
-const pinInputNode = document.getElementById('new-player-pin');
-if(pinInputNode) {
-    pinInputNode.addEventListener('keydown', function(e) {
-        if(e.key === 'Enter') {
-            e.preventDefault(); e.stopPropagation();
-            submitNewPassword();
-        }
-    });
-}
-
-const pseudoInputNode = document.getElementById('optional-pseudo-input');
-if(pseudoInputNode) {
-    pseudoInputNode.addEventListener('keydown', function(e) {
-        if(e.key === 'Enter') {
-            e.preventDefault(); e.stopPropagation();
-            savePseudoChoice();
-        }
-    });
-}
-
-const surveyScreenNode = document.getElementById('screen-survey');
-if(surveyScreenNode) {
-    surveyScreenNode.addEventListener('keydown', function(e) {
-        if(e.key === 'Enter') {
-            if (document.activeElement && document.activeElement.tagName === 'TEXTAREA') return;
-            e.preventDefault(); e.stopPropagation();
-            submitSurveyAndGoToPodium();
-        }
-    });
-}
-
 
 async function submitSurveyAndGoToPodium() {
     let q1 = document.getElementById('survey-q1').value;
@@ -930,10 +1070,13 @@ async function submitSurveyAndGoToPodium() {
             "Q5_Remarque": sanitizeString(q5),
             "Date": new Date().toLocaleDateString('fr-FR')
         });
-    } catch(e) { console.error("Erreur feedback", e); }
+    } catch(e) { 
+        console.error("Erreur feedback", e); 
+    }
 
     showPodium();
 }
+
 
 // ==========================================
 // PODIUM ET MODALE DÉTAILS
@@ -1012,7 +1155,9 @@ async function openModal(playerId) {
         );
         
         if (pwd !== ADMIN_PASSWORD && pwd !== player.PIN) {
-            if (pwd !== null) alert("❌ Mot de passe incorrect.");
+            if (pwd !== null) {
+                alert("❌ Mot de passe incorrect.");
+            }
             return; 
         }
 
@@ -1027,9 +1172,13 @@ async function openModal(playerId) {
         allPlayers.forEach(p => {
             if(p.SessionDetails) { 
                 p.SessionDetails.forEach(q => { 
-                    if(!globalStats[q.q]) globalStats[q.q] = { asked: 0, correct: 0 }; 
+                    if(!globalStats[q.q]) {
+                        globalStats[q.q] = { asked: 0, correct: 0 }; 
+                    }
                     globalStats[q.q].asked++; 
-                    if(q.isCorrect) globalStats[q.q].correct++; 
+                    if(q.isCorrect) {
+                        globalStats[q.q].correct++; 
+                    }
                 }); 
             }
         });
@@ -1099,32 +1248,25 @@ async function changePlayerPassword(playerId) {
     }
 }
 
-// Fonction de fermeture corrigée pour supporter les modales insérées dynamiquement
 function closeModal(modalId) { 
     if(modalId) {
         let m = document.getElementById(modalId);
         if(m) {
             m.classList.remove('show'); 
-            if (m.style.opacity) {
-                m.style.opacity = '0';
-                m.style.pointerEvents = 'none';
-            }
         }
     } else {
         document.querySelectorAll('.modal-content').forEach(m => {
-            let parent = m.parentElement;
-            parent.classList.remove('show');
-            if (parent.style.opacity) {
-                parent.style.opacity = '0';
-                parent.style.pointerEvents = 'none';
-            }
+            m.parentElement.classList.remove('show');
         });
     }
 }
 
 async function toggleKeep(playerId, isChecked) { 
-    try { await set(ref(db, 'scores/' + playerId + '/keep'), isChecked); } 
-    catch (e) { console.error(e); } 
+    try { 
+        await set(ref(db, 'scores/' + playerId + '/keep'), isChecked); 
+    } catch (e) { 
+        console.error(e); 
+    } 
 }
 
 async function deletePlayerScore(playerId) {
@@ -1137,7 +1279,9 @@ async function deletePlayerScore(playerId) {
                 
                 if (!numToFree) {
                     let match = p.Candidat.match(/^Player(\d{4})$/i);
-                    if (match) numToFree = parseInt(match[1], 10);
+                    if (match) {
+                        numToFree = parseInt(match[1], 10);
+                    }
                 }
                 
                 if (numToFree) {
@@ -1164,19 +1308,23 @@ async function resetPodium() {
             await set(ref(db, 'feedbacks'), null); 
             alert("🗑️ Base de données réinitialisée !"); 
             showPodium(); 
-        } catch (error) { alert("Erreur lors de la réinitialisation."); }
+        } catch (error) { 
+            alert("Erreur lors de la réinitialisation."); 
+        }
     }
 }
 
 
 // ==========================================
-// EXPORTS EXCEL ET PDF
+// EXPORTS EXCEL / PDF
 // ==========================================
 async function downloadExcel() {
     closeModal('admin-hub-modal');
     try {
         const snapshot = await get(ref(db, 'scores')); 
-        if (!snapshot.exists()) return alert("Aucune donnée à exporter.");
+        if (!snapshot.exists()) {
+            return alert("Aucune donnée à exporter.");
+        }
         
         let dataPlayers = []; 
         let dataQuestions = []; 
@@ -1222,9 +1370,13 @@ async function downloadExcel() {
         allPlayers.forEach(p => {
             if (p.SessionDetails) { 
                 p.SessionDetails.forEach(q => { 
-                    if (!globalStats[q.q]) { globalStats[q.q] = { cat: q.cat, asked: 0, correct: 0 }; } 
+                    if (!globalStats[q.q]) { 
+                        globalStats[q.q] = { cat: q.cat, asked: 0, correct: 0 }; 
+                    } 
                     globalStats[q.q].asked++; 
-                    if (q.isCorrect) globalStats[q.q].correct++; 
+                    if (q.isCorrect) {
+                        globalStats[q.q].correct++; 
+                    }
                 }); 
             }
         });
@@ -1246,7 +1398,9 @@ async function downloadExcel() {
         const wb = window.XLSX.utils.book_new();
         window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(dataPlayers), "Classement");
         window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(dataQuestions), "Stats Questions");
-        if(dataDetails.length > 0) window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(dataDetails), "Détail Brut");
+        if(dataDetails.length > 0) {
+            window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(dataDetails), "Détail Brut");
+        }
         
         window.XLSX.writeFile(wb, "Resultats_GEII.xlsx");
     } catch (e) { 
@@ -1258,7 +1412,9 @@ async function exportSurveyExcel() {
     closeModal('admin-hub-modal');
     try {
         const snapshot = await get(ref(db, 'feedbacks')); 
-        if (!snapshot.exists()) return alert("Aucun retour de satisfaction enregistré pour le moment.");
+        if (!snapshot.exists()) {
+            return alert("Aucun retour de satisfaction enregistré pour le moment.");
+        }
         
         let dataFeedback = []; 
         const feedbackObj = snapshot.val(); 
@@ -1376,11 +1532,15 @@ function buildPDF(playerData, chartDataUrl) {
         doc.save(`Bilan_GEII_${playerData.Candidat}.pdf`);
     };
 
-    let logoLoaded = false; let logoDataUrl = null;
-    let qrLoaded = false; let qrDataUrl = null;
+    let logoLoaded = false; 
+    let logoDataUrl = null;
+    let qrLoaded = false; 
+    let qrDataUrl = null;
 
     const checkAllLoaded = () => { 
-        if(logoLoaded && qrLoaded) finalize(logoDataUrl, qrDataUrl); 
+        if(logoLoaded && qrLoaded) {
+            finalize(logoDataUrl, qrDataUrl); 
+        }
     };
 
     const imgLogo = new Image(); 
@@ -1393,13 +1553,17 @@ function buildPDF(playerData, chartDataUrl) {
         canvas.getContext('2d').drawImage(imgLogo, 0, 0); 
         logoDataUrl = canvas.toDataURL('image/png');
         
+        let ratio = imgLogo.naturalWidth / imgLogo.naturalHeight;
         logoH = 18;
-        logoW = 18 * (imgLogo.naturalWidth / imgLogo.naturalHeight);
+        logoW = 18 * ratio;
         
         logoLoaded = true; 
         checkAllLoaded();
     };
-    imgLogo.onerror = () => { logoLoaded = true; checkAllLoaded(); };
+    imgLogo.onerror = () => { 
+        logoLoaded = true; 
+        checkAllLoaded(); 
+    };
 
     const imgQR = new Image(); 
     imgQR.src = "qr_code.png"; 
@@ -1412,7 +1576,10 @@ function buildPDF(playerData, chartDataUrl) {
         qrLoaded = true; 
         checkAllLoaded();
     };
-    imgQR.onerror = () => { qrLoaded = true; checkAllLoaded(); };
+    imgQR.onerror = () => { 
+        qrLoaded = true; 
+        checkAllLoaded(); 
+    };
 }
 
 function generatePlayerPDF() {
@@ -1561,7 +1728,9 @@ async function saveQuestion(index) {
     let ans = 0; 
     
     for(let i=0; i<ansRadios.length; i++) { 
-        if(ansRadios[i].checked) ans = parseInt(ansRadios[i].value); 
+        if(ansRadios[i].checked) {
+            ans = parseInt(ansRadios[i].value); 
+        }
     }
     
     dynamicDB[index] = { 
@@ -1588,9 +1757,6 @@ async function saveQuestion(index) {
     }
 }
 
-// ==========================================
-// FENÊTRE ET EXPORT DES QUESTIONS EN PDF
-// ==========================================
 function openExportQuestionsModal() {
     closeModal('admin-hub-modal');
     
@@ -1685,9 +1851,8 @@ function generateQuestionsPDF() {
     closeModal('export-questions-modal');
 }
 
-
 // ==========================================
-// ECRAN DE VEILLE ET ÉCOUTEUR CLAVIER
+// ECRAN DE VEILLE
 // ==========================================
 function resetIdleTimer() { 
     clearTimeout(idleTimer); 
@@ -1736,7 +1901,7 @@ function hideScreensaver() {
 
 resetIdleTimer();
 
-// L'écouteur global pour empêcher les touches "Entrée" de déborder
+// L'écouteur global pour empêcher les touches "Entrée" de déborder (sans casser les modales isolées)
 document.addEventListener('keydown', function(e) {
     const activeScreen = document.querySelector('.active-screen'); 
     const screensaver = document.getElementById('screensaver');
@@ -1770,7 +1935,6 @@ document.addEventListener('keydown', function(e) {
     }
     
     if (e.key === 'Enter') { 
-        // Si une modale est ouverte ou un champ de texte est sélectionné, l'écouteur global s'arrête ici
         if (anyModalOpen || document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') {
             return; 
         }
