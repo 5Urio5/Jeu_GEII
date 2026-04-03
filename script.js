@@ -68,7 +68,7 @@ let modalChartInstance = null;
 let currentViewingPlayerId = null; 
 let isDemoMode = false; 
 let currentAssignedNum = null; 
-let currentScoreId = null; // Protection Anti-Doublon pour la Base de Données
+let currentScoreId = null; // Protection Anti-Doublon (Clé Firebase unique)
 
 const AudioContextClass = window.AudioContext || window.webkitAudioContext;
 let audioCtx;
@@ -118,6 +118,20 @@ window.exportSurveyExcel = exportSurveyExcel;
 // ==========================================
 // LIAISONS SÉCURISÉES DE LA TOUCHE ENTRÉE
 // ==========================================
+
+// 1. Sur le mot de passe Administrateur
+const adminPwdInputNode = document.getElementById('admin-pwd-input');
+if(adminPwdInputNode) {
+    adminPwdInputNode.addEventListener('keydown', function(e) {
+        if(e.key === 'Enter') {
+            e.preventDefault();
+            e.stopPropagation();
+            document.getElementById('submit-pwd-btn').click();
+        }
+    });
+}
+
+// 2. Sur le mot de passe Joueur
 const pinInputNode = document.getElementById('new-player-pin');
 if(pinInputNode) {
     pinInputNode.addEventListener('keydown', function(e) {
@@ -129,6 +143,7 @@ if(pinInputNode) {
     });
 }
 
+// 3. Sur le choix du pseudo Optionnel
 const pseudoInputNode = document.getElementById('optional-pseudo-input');
 if(pseudoInputNode) {
     pseudoInputNode.addEventListener('keydown', function(e) {
@@ -140,12 +155,13 @@ if(pseudoInputNode) {
     });
 }
 
+// 4. Sur le Questionnaire
 const surveyScreenNode = document.getElementById('screen-survey');
 if(surveyScreenNode) {
     surveyScreenNode.addEventListener('keydown', function(e) {
         if(e.key === 'Enter') {
             if (document.activeElement && document.activeElement.tagName === 'TEXTAREA') {
-                return;
+                return; // Autorise les sauts de ligne dans la zone remarque
             }
             e.preventDefault();
             e.stopPropagation();
@@ -153,7 +169,6 @@ if(surveyScreenNode) {
         }
     });
 }
-
 
 // ==========================================
 // DÉFINITION DES FONCTIONS
@@ -165,13 +180,13 @@ async function loadQuestionsFromFirebase() {
         if (snap.exists()) {
             dynamicDB = snap.val();
         } else {
-            let localDB = (typeof window.DB !== 'undefined') ? window.DB : (typeof DB !== 'undefined' ? DB : []);
+            let localDB = (typeof DB !== 'undefined') ? DB : [];
             await set(ref(db, 'questions'), localDB);
             dynamicDB = localDB;
         }
     } catch (error) {
         console.error("Erreur de chargement des questions, utilisation locale.", error);
-        dynamicDB = (typeof window.DB !== 'undefined') ? window.DB : (typeof DB !== 'undefined' ? DB : []); 
+        dynamicDB = (typeof DB !== 'undefined') ? DB : []; 
     }
 }
 loadQuestionsFromFirebase();
@@ -197,7 +212,6 @@ function askPassword(customTitle = "⚠️ ZONE SÉCURISÉE ⚠️", customDesc 
             modal.classList.remove('show');
             submitBtn.onclick = null; 
             cancelBtn.onclick = null; 
-            input.onkeydown = null;
         };
         
         submitBtn.onclick = () => { cleanup(); resolve(input.value); };
@@ -217,7 +231,6 @@ function togglePasswordVisibility() {
     }
 }
 
-// NOUVEAU : Masquer/Afficher le mot de passe du Joueur
 function togglePlayerPasswordVisibility() {
     const input = document.getElementById('new-player-pin');
     const toggleBtn = document.getElementById('toggle-player-pwd-btn');
@@ -339,15 +352,15 @@ function goToStart() {
     if(pinInput) {
         pinInput.value = '';
         pinInput.type = 'password';
-        let toggleBtn = document.getElementById('toggle-player-pwd-btn');
-        if (toggleBtn) toggleBtn.innerText = '👁️';
+        let togglePlayerBtn = document.getElementById('toggle-player-pwd-btn');
+        if (togglePlayerBtn) togglePlayerBtn.innerText = '👁️';
     }
     
-    let sq1 = document.getElementById('survey-q1'); if(sq1) sq1.value = "";
-    let sq2 = document.getElementById('survey-q2'); if(sq2) sq2.value = "";
-    let sq3 = document.getElementById('survey-q3'); if(sq3) sq3.value = "";
-    let sq4 = document.getElementById('survey-q4'); if(sq4) sq4.value = "";
-    let sq5 = document.getElementById('survey-q5'); if(sq5) sq5.value = "";
+    let survey1 = document.getElementById('survey-q1'); if(survey1) survey1.value = "";
+    let survey2 = document.getElementById('survey-q2'); if(survey2) survey2.value = "";
+    let survey3 = document.getElementById('survey-q3'); if(survey3) survey3.value = "";
+    let survey4 = document.getElementById('survey-q4'); if(survey4) survey4.value = "";
+    let survey5 = document.getElementById('survey-q5'); if(survey5) survey5.value = "";
 
     slideTo('screen-start');
 }
@@ -390,19 +403,18 @@ async function startQuiz() {
     if (!audioCtx) audioCtx = new AudioContextClass(); 
     if (audioCtx.state === 'suspended') audioCtx.resume();
 
-    // Réinitialisation des formulaires par sécurité
     let pinInput = document.getElementById('new-player-pin');
-    if (pinInput) {
+    if(pinInput) {
         pinInput.value = '';
         pinInput.type = 'password';
-        let toggleBtn = document.getElementById('toggle-player-pwd-btn');
-        if (toggleBtn) toggleBtn.innerText = '👁️';
+        let togglePlayerBtn = document.getElementById('toggle-player-pwd-btn');
+        if (togglePlayerBtn) togglePlayerBtn.innerText = '👁️';
     }
-    let sq1 = document.getElementById('survey-q1'); if(sq1) sq1.value = "";
-    let sq2 = document.getElementById('survey-q2'); if(sq2) sq2.value = "";
-    let sq3 = document.getElementById('survey-q3'); if(sq3) sq3.value = "";
-    let sq4 = document.getElementById('survey-q4'); if(sq4) sq4.value = "";
-    let sq5 = document.getElementById('survey-q5'); if(sq5) sq5.value = "";
+    let survey1 = document.getElementById('survey-q1'); if(survey1) survey1.value = "";
+    let survey2 = document.getElementById('survey-q2'); if(survey2) survey2.value = "";
+    let survey3 = document.getElementById('survey-q3'); if(survey3) survey3.value = "";
+    let survey4 = document.getElementById('survey-q4'); if(survey4) survey4.value = "";
+    let survey5 = document.getElementById('survey-q5'); if(survey5) survey5.value = "";
 
     playerPin = ""; 
     scoresPoints = {AII: 0, EME: 0, ESE: 0}; 
@@ -413,11 +425,9 @@ async function startQuiz() {
     currentAssignedNum = null;
     currentScoreId = null;
 
-    let safeDB = dynamicDB.filter(q => q !== null && q !== undefined && q.cat);
-
     let selected = [];
     ['AII', 'EME', 'ESE'].forEach(cat => {
-        let catQ = safeDB.filter(q => q.cat === cat);
+        let catQ = dynamicDB.filter(q => q && q.cat === cat);
         let qCom = getRandom(catQ.filter(q => q.diff === "Com"), 2);
         let qSTI = getRandom(catQ.filter(q => q.diff === "STI"), 3);
         let qBU1 = getRandom(catQ.filter(q => q.diff === "BU1"), 3);
@@ -426,25 +436,16 @@ async function startQuiz() {
     });
     
     selected = selected.filter(q => q !== undefined && q !== null);
-    if (selected.length < 30) {
-        let missingCount = 30 - selected.length;
-        let remainingQuestions = safeDB.filter(q => !selected.includes(q));
-        let fillQuestions = getRandom(remainingQuestions, missingCount);
-        selected = selected.concat(fillQuestions);
-    }
     currentQuestions = selected.sort(() => 0.5 - Math.random());
-    totalQuestions = currentQuestions.length;
 
     // SIMULATION MODE DÉMO
     if (isDemoMode) {
         isDemoMode = false; 
         playerName = "PlayerManon (Démo)";
         
-        let questionsToSimulate = totalQuestions - 1;
-        
-        for(let i = 0; i < questionsToSimulate; i++) {
+        for(let i = 0; i < 29; i++) {
             let q = currentQuestions[i];
-            if (!q) continue;
+            if(!q) continue;
             let isCorrect = Math.random() > 0.3; 
             let timeTaken = Math.floor(Math.random() * 15) + 2; 
             let timeLeftSim = timeLimit - timeTaken;
@@ -470,15 +471,15 @@ async function startQuiz() {
             });
         }
         
-        currentQIndex = questionsToSimulate; 
+        currentQIndex = 29; 
         
         let progContainer = document.getElementById('progress-container'); 
         progContainer.innerHTML = '';
-        for(let i=0; i<totalQuestions; i++) { 
+        for(let i=0; i<30; i++) { 
             let box = document.createElement('div');
             box.className = 'progress-box';
             box.id = `box-${i}`;
-            if (i < questionsToSimulate) {
+            if (i < 29) {
                 if (playerSessionDetails[i] && playerSessionDetails[i].isCorrect) box.classList.add('prog-correct');
                 else box.classList.add('prog-wrong');
             }
@@ -514,7 +515,7 @@ async function startQuiz() {
     
     let progContainer = document.getElementById('progress-container'); 
     progContainer.innerHTML = '';
-    for(let i=0; i<totalQuestions; i++) { 
+    for(let i=0; i<30; i++) { 
         progContainer.innerHTML += `<div class="progress-box" id="box-${i}"></div>`; 
     }
     
@@ -535,10 +536,11 @@ function loadQuestion() {
     document.getElementById('timer-text').innerText = `⏱️ ${timeLeft}s`;
 
     let qData = currentQuestions[currentQIndex];
-    if (!qData) {
+    if(!qData) {
         processAnswer(-1, 0, null);
         return;
     }
+    
     let diffClass = "diff-" + qData.diff;
     let displayDiff = DIFF_LABELS[qData.diff] || qData.diff;
     
@@ -581,7 +583,6 @@ function loadQuestion() {
         
         let pct = (timeLeft / timeLimit) * 100; 
         timerBar.style.width = pct + "%";
-        
         if (pct < 50 && pct > 20) timerBar.style.backgroundColor = "#f1c40f"; 
         if (pct <= 20) timerBar.style.backgroundColor = "#e74c3c"; 
 
@@ -615,7 +616,7 @@ function processAnswer(selectedIndex, correctIndex, clickedBtn) {
         
         scoreTotal += pointsGained; 
         scoresPoints[qData.cat] += pointsGained;
-    } else if (qData) {
+    } else if(qData) {
         currentStreak = 0; 
         playSound(isTimeout ? 'timeout' : 'wrong');
         if(clickedBtn) clickedBtn.classList.add('btn-wrong'); 
@@ -625,7 +626,7 @@ function processAnswer(selectedIndex, correctIndex, clickedBtn) {
         });
     }
     
-    if (qData) {
+    if(qData) {
         playerSessionDetails.push({ 
             cat: qData.cat, 
             diff: qData.diff, 
@@ -851,8 +852,8 @@ function saveScoreFirebase(name, totalScore, profil, pin, pNum) {
     const newRef = push(ref(db, 'scores'));
     currentScoreId = newRef.key;
     
-    // Le pNum doit être un chiffre pour Firebase
-    let safePNum = (pNum !== null && pNum !== undefined) ? pNum : 0;
+    // Fallback de sécurité si pNum n'existe pas, on envoie 0 pour satisfaire Firebase.
+    let safePNum = (pNum !== null && pNum !== undefined && pNum !== "") ? Number(pNum) : 0;
     
     set(newRef, { 
         "Candidat": name, 
@@ -864,9 +865,7 @@ function saveScoreFirebase(name, totalScore, profil, pin, pNum) {
         "SessionDetails": playerSessionDetails, 
         "keep": false, 
         "PIN": pin || "" 
-    }).catch(e => {
-        console.error("Score save error:", e);
-    });
+    }).catch(e => console.error("Erreur Firebase:", e));
 }
 
 // ==========================================
@@ -903,6 +902,7 @@ async function savePseudoChoice() {
                 const scoresObj = snapshot.val();
                 let isDuplicate = false;
                 
+                // VERIFICATION ANTI-DOUBLON
                 for (let key in scoresObj) {
                     if (scoresObj[key].Candidat && scoresObj[key].Candidat.toLowerCase() === cleanName.toLowerCase() && key !== currentScoreId) {
                         isDuplicate = true;
@@ -911,7 +911,7 @@ async function savePseudoChoice() {
                 }
                 
                 if (isDuplicate) {
-                    alert("❌ Ce pseudo est déjà pris par un autre joueur ! Choisis-en un autre.");
+                    alert("❌ Ce pseudo est déjà utilisé par un autre joueur !");
                     return; 
                 }
             }
@@ -1106,11 +1106,11 @@ async function editPseudo(playerId) {
                     }
                 }
                 if (isDuplicate) {
-                    alert("❌ Ce pseudo est déjà pris par un autre joueur !");
+                    alert("❌ Ce pseudo est déjà utilisé par un autre joueur !");
                     return;
                 }
             }
-
+            
             await set(ref(db, `scores/${playerId}/Candidat`), cleanName);
             document.getElementById('detail-pseudo-display').innerText = cleanName;
             showPodium(); 
@@ -1456,7 +1456,6 @@ async function generateAdminPDF() {
     }
 }
 
-// Fonction D'export Direct des questions 
 function exportQuestionsPDF() {
     closeModal('admin-hub-modal');
     
@@ -1507,8 +1506,13 @@ function exportQuestionsPDF() {
 // ==========================================
 function openQuestionEditor() {
     closeModal('admin-hub-modal');
-    document.getElementById('filter-cat').value = 'ALL';
-    document.getElementById('filter-diff').value = 'ALL';
+    
+    // Protection pour éviter l'erreur TypeError si le HTML n'a pas les filtres
+    let catFilter = document.getElementById('filter-cat');
+    let diffFilter = document.getElementById('filter-diff');
+    if (catFilter) catFilter.value = 'ALL';
+    if (diffFilter) diffFilter.value = 'ALL';
+    
     renderEditorList(); 
     document.getElementById('editor-modal').classList.add('show'); 
 }
@@ -1520,10 +1524,13 @@ function closeEditor() {
 
 function renderEditorList() {
     let tbody = document.getElementById('editor-table-body'); 
+    if (!tbody) return;
     tbody.innerHTML = '';
     
-    let filterCat = document.getElementById('filter-cat').value;
-    let filterDiff = document.getElementById('filter-diff').value;
+    let catFilter = document.getElementById('filter-cat');
+    let diffFilter = document.getElementById('filter-diff');
+    let filterCat = catFilter ? catFilter.value : 'ALL';
+    let filterDiff = diffFilter ? diffFilter.value : 'ALL';
     
     dynamicDB.forEach((q, i) => { 
         if (filterCat !== 'ALL' && q.cat !== filterCat) return;
@@ -1552,8 +1559,11 @@ function addNewQuestion() {
         trivia: "Le saviez-vous ?" 
     }); 
     
-    document.getElementById('filter-cat').value = 'ALL';
-    document.getElementById('filter-diff').value = 'ALL';
+    let catFilter = document.getElementById('filter-cat');
+    let diffFilter = document.getElementById('filter-diff');
+    if (catFilter) catFilter.value = 'ALL';
+    if (diffFilter) diffFilter.value = 'ALL';
+    
     renderEditorList();
     editQuestion(dynamicDB.length - 1); 
 }
@@ -1626,9 +1636,7 @@ async function saveQuestion(index) {
     let ans = 0; 
     
     for(let i=0; i<ansRadios.length; i++) { 
-        if(ansRadios[i].checked) {
-            ans = parseInt(ansRadios[i].value); 
-        }
+        if(ansRadios[i].checked) ans = parseInt(ansRadios[i].value); 
     }
     
     dynamicDB[index] = { 
@@ -1651,10 +1659,9 @@ async function saveQuestion(index) {
         renderEditorList(); 
         alert("✅ Question sauvegardée dans la base Firebase !"); 
     } catch(e) { 
-        alert("Erreur lors de la sauvegarde Firebase : " + e.message); 
+        alert("Erreur lors de la sauvegarde Firebase."); 
     }
 }
-
 
 // ==========================================
 // ECRAN DE VEILLE ET ÉCOUTEUR CLAVIER GLOBAL
@@ -1735,7 +1742,6 @@ document.addEventListener('keydown', function(e) {
     }
     
     if (e.key === 'Enter') { 
-        // Si une modale est ouverte ou un champ de texte est sélectionné, l'écouteur global s'arrête ici
         if (anyModalOpen || document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') {
             return; 
         }
@@ -1745,10 +1751,15 @@ document.addEventListener('keydown', function(e) {
                 startQuiz();
             } else if (activeScreen.id === 'screen-intermediate') { 
                 goToNextQuestion(); 
-            } 
+            } else if (activeScreen.id === 'screen-create-password') {
+                submitNewPassword();
+            } else if (activeScreen.id === 'screen-survey') {
+                submitSurveyAndGoToPodium();
+            }
         } 
     }
     
+    // FLÈCHES DU CLAVIER (Navigation dans les réponses)
     if (activeScreen && activeScreen.id === 'screen-game' && !anyModalOpen) {
         if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
             e.preventDefault(); 
