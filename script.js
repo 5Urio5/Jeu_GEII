@@ -68,7 +68,7 @@ let modalChartInstance = null;
 let currentViewingPlayerId = null; 
 let isDemoMode = false; 
 let currentAssignedNum = null; 
-let currentScoreId = null; // 🔥 VARIABLE AJOUTÉE POUR GÉRER LES DOUBLONS DE PSEUDO
+let currentScoreId = null; // Protection Anti-Doublon pour la Base de Données
 
 const AudioContextClass = window.AudioContext || window.webkitAudioContext;
 let audioCtx;
@@ -106,7 +106,7 @@ window.editPseudo = editPseudo;
 window.changePlayerPassword = changePlayerPassword;
 window.openAdminHub = openAdminHub;
 window.startDemoMode = startDemoMode;
-window.exportQuestionsPDF = exportQuestionsPDF; // ⬅️ RÉTABLI ICI POUR ÉVITER L'ERREUR DE CONSOLE
+window.exportQuestionsPDF = exportQuestionsPDF;
 window.renderEditorList = renderEditorList;
 window.openPseudoChoiceModal = openPseudoChoiceModal;
 window.skipPseudoChoice = skipPseudoChoice;
@@ -295,7 +295,7 @@ function goToStart() {
     setRandomBackground(); 
     resetIdleTimer(); 
     
-    // Purge de la zone du mot de passe
+    // 🔥 NOUVEAU : Réinitialiser la zone du mot de passe
     let pinInput = document.getElementById('new-player-pin');
     if(pinInput) {
         pinInput.value = '';
@@ -303,7 +303,7 @@ function goToStart() {
         document.getElementById('toggle-player-pwd-btn').innerText = '👁️';
     }
     
-    // Purger intégralement les données du questionnaire précédent
+    // 🔥 NOUVEAU : Purger intégralement les données du questionnaire précédent
     document.getElementById('survey-q1').value = "";
     document.getElementById('survey-q2').value = "";
     document.getElementById('survey-q3').value = "";
@@ -380,6 +380,8 @@ async function startQuiz() {
         let qBU2 = getRandom(catQ.filter(q => q.diff === "BU2"), 2);
         selected = selected.concat(qCom, qSTI, qBU1, qBU2);
     });
+    
+    selected = selected.filter(q => q !== undefined && q !== null);
     currentQuestions = selected.sort(() => 0.5 - Math.random());
 
     // SIMULATION MODE DÉMO
@@ -389,6 +391,7 @@ async function startQuiz() {
         
         for(let i = 0; i < 29; i++) {
             let q = currentQuestions[i];
+            if(!q) continue;
             let isCorrect = Math.random() > 0.3; 
             let timeTaken = Math.floor(Math.random() * 15) + 2; 
             let timeLeftSim = timeLimit - timeTaken;
@@ -423,7 +426,7 @@ async function startQuiz() {
             box.className = 'progress-box';
             box.id = `box-${i}`;
             if (i < 29) {
-                if (playerSessionDetails[i].isCorrect) box.classList.add('prog-correct');
+                if (playerSessionDetails[i] && playerSessionDetails[i].isCorrect) box.classList.add('prog-correct');
                 else box.classList.add('prog-wrong');
             }
             progContainer.appendChild(box);
@@ -776,7 +779,6 @@ async function showResultsFinal() {
     slideTo('screen-results');
 }
 
-// 🔥 NOUVEAU : ENREGISTRE LA CLÉ SECRÈTE DE LA PARTIE
 function saveScoreFirebase(name, totalScore, profil, pin, pNum) {
     const newRef = push(ref(db, 'scores'));
     currentScoreId = newRef.key;
@@ -818,7 +820,6 @@ function showPseudoInput() {
     document.getElementById('optional-pseudo-input').focus();
 }
 
-// 🔥 NOUVEAU : MET À JOUR LE PSEUDO EN CIBLANT DIRECTEMENT LA CLÉ SECRÈTE
 async function savePseudoChoice() {
     let input = document.getElementById('optional-pseudo-input').value.trim();
     if (input !== "") {
@@ -1347,52 +1348,6 @@ async function generateAdminPDF() {
     }
 }
 
-// 🔥 NOUVEAU : EXPORT DIRECT (SANS FILTRE) POUR EVITER LES BUGS
-function exportQuestionsPDF() {
-    closeModal('admin-hub-modal');
-    
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF('landscape');
-    
-    doc.setFont("helvetica", "bold"); 
-    doc.setFontSize(16);
-    doc.text("BASE DE DONNÉES DES QUESTIONS GEII", 14, 15);
-    
-    let tableData = [];
-    
-    let sortedDB = [...dynamicDB].sort((a, b) => {
-        if (a.cat === b.cat) return a.diff.localeCompare(b.diff);
-        return a.cat.localeCompare(b.cat);
-    });
-
-    sortedDB.forEach(q => { 
-        tableData.push([ 
-            q.cat, 
-            DIFF_LABELS[q.diff] || q.diff, 
-            q.q, 
-            q.opt[q.ans], 
-            q.trivia 
-        ]); 
-    }); 
-    
-    doc.autoTable({
-        startY: 25,
-        head: [['Catégorie', 'Difficulté', 'Question', 'Bonne Réponse', 'Le Saviez-vous ?']],
-        body: tableData,
-        headStyles: { fillColor: [52, 152, 219] },
-        styles: { fontSize: 9 },
-        columnStyles: { 
-            0: { cellWidth: 20 }, 
-            1: { cellWidth: 20 }, 
-            2: { cellWidth: 80 }, 
-            3: { cellWidth: 50 },
-            4: { cellWidth: 90 }
-        }
-    });
-
-    doc.save(`Questions_GEII.pdf`);
-}
-
 // ==========================================
 // EDITEUR DE QUESTIONS (ADMIN)
 // ==========================================
@@ -1543,6 +1498,51 @@ async function saveQuestion(index) {
     } catch(e) { 
         alert("Erreur lors de la sauvegarde Firebase."); 
     }
+}
+
+function exportQuestionsPDF() {
+    closeModal('admin-hub-modal');
+    
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('landscape');
+    
+    doc.setFont("helvetica", "bold"); 
+    doc.setFontSize(16);
+    doc.text("BASE DE DONNÉES DES QUESTIONS GEII", 14, 15);
+    
+    let tableData = [];
+    
+    let sortedDB = [...dynamicDB].sort((a, b) => {
+        if (a.cat === b.cat) return a.diff.localeCompare(b.diff);
+        return a.cat.localeCompare(b.cat);
+    });
+
+    sortedDB.forEach(q => { 
+        tableData.push([ 
+            q.cat, 
+            DIFF_LABELS[q.diff] || q.diff, 
+            q.q, 
+            q.opt[q.ans], 
+            q.trivia 
+        ]); 
+    }); 
+    
+    doc.autoTable({
+        startY: 25,
+        head: [['Catégorie', 'Difficulté', 'Question', 'Bonne Réponse', 'Le Saviez-vous ?']],
+        body: tableData,
+        headStyles: { fillColor: [52, 152, 219] },
+        styles: { fontSize: 9 },
+        columnStyles: { 
+            0: { cellWidth: 20 }, 
+            1: { cellWidth: 20 }, 
+            2: { cellWidth: 80 }, 
+            3: { cellWidth: 50 },
+            4: { cellWidth: 90 }
+        }
+    });
+
+    doc.save(`Questions_GEII.pdf`);
 }
 
 // ==========================================
